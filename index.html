@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Магазин красивих номерів</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // Инициализация Telegram WebApp
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        // Конфигурация API
+        const API_URL = 'https://ph-mp-api.vercel.app';
+        
+        // Курс TON к UAH (будет загружаться с API)
+        const DEFAULT_TON_RATE = 64;
+
+        // Функция определения оператора по коду номера
+        function getOperatorByCode(phoneNumber) {
+            // Извлекаем код из скобок, например из "+380 (67) 777-88-99" берем "67"
+            const match = phoneNumber.match(/\((\d+)\)/);
+            const code = match ? match[1] : '';
+            
+            // Если код 2-значный, добавляем 0 в начало для сопоставления
+            const fullCode = code.length === 2 ? '0' + code : code;
+            
+            const operatorCodes = {
+                '068': 'Kyivstar',
+                '098': 'Kyivstar',
+                '096': 'Kyivstar',
+                '067': 'Kyivstar',
+                '097': 'Kyivstar',
+                '077': 'Kyivstar',
+                '063': 'lifecell',
+                '093': 'lifecell',
+                '073': 'lifecell',
+                '066': 'Vodafone',
+                '050': 'Vodafone',
+                '095': 'Vodafone',
+                '075': 'Vodafone',
+                '099': 'Vodafone'
+            };
+            
+            return operatorCodes[fullCode] || 'Невідомий оператор';
+        }
+
+        // Хук debounce для оптимизации
+        function useDebounce(value, delay) {
+            const [debouncedValue, setDebouncedValue] = useState(value);
+
+            useEffect(() => {
+                const handler = setTimeout(() => {
+                    setDebouncedValue(value);
+                }, delay);
+
+                return () => {
+                    clearTimeout(handler);
+                };
+            }, [value, delay]);
+
+            return debouncedValue;
+        }
+
+        // Компонент приложения
+        function PhoneMarketplace() {
+            const [phones, setPhones] = useState([]);
+            const [filteredPhones, setFilteredPhones] = useState([]);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [favorites, setFavorites] = useState([]);
+            const [selectedPhone, setSelectedPhone] = useState(null);
+            const [activeTab, setActiveTab] = useState('catalog');
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+            const [sortBy, setSortBy] = useState('cheap');
+            const [maxPriceInput, setMaxPriceInput] = useState('');
+            const [tonRate, setTonRate] = useState(DEFAULT_TON_RATE);
+            
+            // Короткие названия для отображения в select
+            const sortLabels = {
+                cheap: 'Дешевше',
+                expensive: 'Дорожче'
+            };
+
+            // Debounced значения для оптимизации
+            const debouncedSearch = useDebounce(searchQuery, 300);
+            const debouncedMaxPrice = useDebounce(maxPriceInput, 300);
+
+            // Загрузка данных из API
+            useEffect(() => {
+                loadPhones();
+                loadTonRate();
+                
+                // Обновление курса TON каждые 60 минут
+                const interval = setInterval(loadTonRate, 60 * 60 * 1000);
+                return () => clearInterval(interval);
+            }, []);
+
+            async function loadPhones() {
+                try {
+                    setLoading(true);
+                    setError(null);
+                    
+                    const response = await fetch(`${API_URL}/api/phones`);
+                    
+                    if (!response.ok) {
+                        throw new Error('Помилка при завантаженні даних');
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        setPhones(data.data);
+                        setFilteredPhones(data.data);
+                    } else {
+                        throw new Error(data.error || 'Невідома помилка');
+                    }
+                } catch (err) {
+                    console.error('Помилка завантаження:', err);
+                    setError(err.message);
+                } finally {
+                    setLoading(false);
+                }
+            }
+
+            async function loadTonRate() {
+                try {
+                    const response = await fetch(`${API_URL}/api/ton-rate`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.success && data.rate) {
+                            console.log('Курс TON завантажено:', data.rate);
+                            setTonRate(data.rate);
+                        }
+                    }
+                } catch (err) {
+                    console.log('Використовуємо курс за замовчуванням:', DEFAULT_TON_RATE);
+                }
+            }
+
+            // Получение последних 7 цифр номера
+            const getLastSevenDigits = (number) => {
+                const digits = number.replace(/\D/g, '');
+                return digits.slice(-7);
+            };
+
+            // Поиск с поддержкой маски * (любая цифра) - ИСПРАВЛЕННАЯ ВЕРСИЯ
+            const matchesWildcard = (pattern, text) => {
+                // Удаляем все нецифровые символы кроме *
+                const cleanPattern = pattern.replace(/[^\d*]/g, '');
+                
+                // Если нет звёздочек, простой поиск по вхождению
+                if (!cleanPattern.includes('*')) {
+                    return text.includes(cleanPattern);
+                }
+                
+                // Создаём регулярное выражение для точного позиционного поиска
+                // 555**** означает: начинается с 555, потом любые 4 цифры
+                let regexPattern = '^'; // Начало строки
+                
+                for (let char of cleanPattern) {
+                    if (char === '*') {
+                        regexPattern += '\\d'; // * = ровно одна цифра
+                    } else {
+                        regexPattern += char; // Конкретная цифра
+                    }
+                }
+                
+                // Если паттерн короче 7 символов, добавляем возможность любых цифр в конце
+                const patternLength = cleanPattern.length;
+                if (patternLength < 7) {
+                    regexPattern += '\\d*'; // Любые цифры в конце
+                }
+                
+                regexPattern += '$'; // Конец строки
+                
+                const regex = new RegExp(regexPattern);
+                return regex.test(text);
+            };
+
+            // Фильтрация и сортировка
+            useEffect(() => {
+                let filtered = phones;
+
+                // Поиск по последним 7 цифрам с поддержкой маски
+                if (debouncedSearch) {
+                    filtered = filtered.filter(p => {
+                        const lastSeven = getLastSevenDigits(p.number);
+                        return matchesWildcard(debouncedSearch, lastSeven);
+                    });
+                }
+
+                // Фильтр по максимальной цене
+                if (debouncedMaxPrice) {
+                    const maxPriceValue = parseInt(debouncedMaxPrice);
+                    if (!isNaN(maxPriceValue)) {
+                        filtered = filtered.filter(p => p.price <= maxPriceValue);
+                    }
+                }
+
+                // Сортировка
+                if (sortBy === 'expensive') {
+                    filtered = [...filtered].sort((a, b) => b.price - a.price);
+                } else if (sortBy === 'cheap') {
+                    filtered = [...filtered].sort((a, b) => a.price - b.price);
+                }
+
+                setFilteredPhones(filtered);
+            }, [phones, debouncedSearch, sortBy, debouncedMaxPrice]);
+
+            // Счётчик найденных номеров
+            const searchCounter = useMemo(() => {
+                return `Знайдено: ${filteredPhones.length} з ${phones.length}`;
+            }, [filteredPhones.length, phones.length]);
+
+            // Избранное
+            const toggleFavorite = (phoneId) => {
+                setFavorites(prev => 
+                    prev.includes(phoneId) 
+                        ? prev.filter(id => id !== phoneId)
+                        : [...prev, phoneId]
+                );
+            };
+
+            // Контакт с продавцом
+            const contactSeller = (phone) => {
+                const message = `Вітаю! Цікавить номер ${phone.number} за ${phone.price.toLocaleString('uk-UA')} грн.`;
+                tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(message)}`);
+            };
+
+            // Конвертация в TON с математическим округлением - ИСПРАВЛЕННАЯ ВЕРСИЯ
+            const convertToTon = (priceUah) => {
+                const tonValue = priceUah / tonRate;
+                return Math.round(tonValue);
+            };
+
+            // Обработка ошибок
+            if (error && phones.length === 0) {
+                return (
+                    <div style={styles.container}>
+                        <div style={styles.errorContainer}>
+                            <div style={styles.errorIcon}>⚠️</div>
+                            <h2 style={styles.errorTitle}>Помилка завантаження</h2>
+                            <p style={styles.errorText}>{error}</p>
+                            <button style={styles.retryBtn} onClick={loadPhones}>
+                                Спробувати знову
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div style={styles.container}>
+                    {/* Фиксированная шапка */}
+                    <div style={styles.stickyHeader}>
+                        {/* Компактная шапка */}
+                        <div style={styles.header}>
+                            <h1 style={styles.title}>📱 Магазин красивих номерів</h1>
+                            <p style={styles.subtitle}>Підберіть собі найкращий номер</p>
+                        </div>
+
+                        {/* Табы */}
+                        <div style={styles.tabs}>
+                            <button 
+                                style={{...styles.tab, ...(activeTab === 'catalog' ? styles.activeTab : {})}}
+                                onClick={() => setActiveTab('catalog')}
+                            >
+                                Каталог
+                            </button>
+                            <button 
+                                style={{...styles.tab, ...(activeTab === 'favorites' ? styles.activeTab : {})}}
+                                onClick={() => setActiveTab('favorites')}
+                            >
+                                Обране ({favorites.length})
+                            </button>
+                        </div>
+
+                        {activeTab === 'catalog' && (
+                            <>
+                                {/* Поиск с поддержкой маски */}
+                                <div style={styles.searchContainer}>
+                                    <input
+                                        type="text"
+                                        placeholder="🔍 Пошук за цифрами"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        maxLength={7}
+                                        style={styles.searchInput}
+                                    />
+                                    <div style={styles.searchInfoRow}>
+                                        <div style={styles.searchHint}><span style={{fontSize: '18px', verticalAlign: 'middle', lineHeight: '13px'}}>*</span> - будь-яка цифра</div>
+                                        <div style={styles.searchCounter}>{searchCounter}</div>
+                                    </div>
+                                </div>
+
+                                {/* Сортировка и фильтр по цене в одной строке */}
+                                <div style={styles.filtersRow}>
+                                    <div style={{position: 'relative', flex: '0 0 35%'}}>
+                                        <select 
+                                            style={styles.sortSelect}
+                                            value={sortBy}
+                                            onChange={(e) => setSortBy(e.target.value)}
+                                        >
+                                            <option value="cheap">Спочатку дешевше</option>
+                                            <option value="expensive">Спочатку дорожче</option>
+                                        </select>
+                                        <div style={styles.sortDisplayText}>{sortLabels[sortBy]}</div>
+                                        <div style={styles.sortArrow}>
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M4 9l8 8 8-8" stroke="#667eea" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+
+                                    <div style={styles.priceFilterInput}>
+                                        <input
+                                            type="number"
+                                            placeholder="Обмежити ціну"
+                                            value={maxPriceInput}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                if (value.length <= 6) {
+                                                    setMaxPriceInput(value);
+                                                }
+                                            }}
+                                            maxLength={6}
+                                            style={styles.priceInput}
+                                        />
+                                        <span style={styles.priceLabel}>грн.</span>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Простой список без виртуализации */}
+                    {activeTab === 'catalog' ? (
+                        loading ? (
+                            <div style={styles.loading}>
+                                <div style={styles.spinner}></div>
+                                <p>Завантаження номерів...</p>
+                            </div>
+                        ) : (
+                            <div style={styles.phoneList}>
+                                {filteredPhones.map(phone => (
+                                    <PhoneCard
+                                        key={phone.id}
+                                        phone={phone}
+                                        isFavorite={favorites.includes(phone.id)}
+                                        onToggleFavorite={() => toggleFavorite(phone.id)}
+                                        onSelect={() => setSelectedPhone(phone)}
+                                        convertToTon={convertToTon}
+                                    />
+                                ))}
+                                {filteredPhones.length === 0 && (
+                                    <div style={styles.noResults}>
+                                        <p>Номери не знайдено</p>
+                                        <p style={styles.noResultsHint}>Спробуйте змінити фільтри</p>
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    ) : (
+                        <div style={styles.phoneList}>
+                            {phones.filter(p => favorites.includes(p.id)).map(phone => (
+                                <PhoneCard
+                                    key={phone.id}
+                                    phone={phone}
+                                    isFavorite={true}
+                                    onToggleFavorite={() => toggleFavorite(phone.id)}
+                                    onSelect={() => setSelectedPhone(phone)}
+                                    convertToTon={convertToTon}
+                                />
+                            ))}
+                            {favorites.length === 0 && (
+                                <div style={styles.noResults}>
+                                    <p>Обраних номерів немає</p>
+                                    <p style={styles.noResultsHint}>Додайте номери, які сподобались</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Модальное окно деталей */}
+                    {selectedPhone && (
+                        <PhoneDetails
+                            phone={selectedPhone}
+                            onClose={() => setSelectedPhone(null)}
+                            onContact={() => contactSeller(selectedPhone)}
+                            isFavorite={favorites.includes(selectedPhone.id)}
+                            onToggleFavorite={() => toggleFavorite(selectedPhone.id)}
+                            convertToTon={convertToTon}
+                        />
+                    )}
+                </div>
+            );
+        }
+
+        // Компонент карточки номера
+        function PhoneCard({ phone, isFavorite, onToggleFavorite, onSelect, convertToTon }) {
+            return (
+                <div style={styles.phoneCard} onClick={onSelect}>
+                    <div style={styles.cardContent}>
+                        <div style={styles.phoneNumber}>{phone.number}</div>
+                        <button
+                            style={styles.favoriteBtn}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleFavorite();
+                            }}
+                        >
+                            {isFavorite ? '❤️' : '🤍'}
+                        </button>
+                    </div>
+                    <div style={styles.priceContainer}>
+                        <div style={styles.priceUah}>{phone.price.toLocaleString('uk-UA')} грн.</div>
+                        <div style={styles.priceTon}>💎 {convertToTon(phone.price)} TON</div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Компонент детальной информации
+        function PhoneDetails({ phone, onClose, onContact, isFavorite, onToggleFavorite, convertToTon }) {
+            return (
+                <div style={styles.modal} onClick={onClose}>
+                    <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+                        <div style={styles.modalHeader}>
+                            <h2 style={styles.modalTitle}>Деталі номера</h2>
+                            <button style={styles.closeBtn} onClick={onClose}>✕</button>
+                        </div>
+
+                        <div style={styles.modalBody}>
+                            <div style={styles.detailsNumber}>{phone.number}</div>
+                            <div style={styles.detailsOperator}>Оператор: {getOperatorByCode(phone.number)}</div>
+
+                            <div style={styles.detailsPriceBox}>
+                                <div style={styles.detailsPriceRow}>
+                                    <span style={styles.priceLabel}>Ціна в гривнях:</span>
+                                    <span style={styles.priceValueUah}>{phone.price.toLocaleString('uk-UA')} грн.</span>
+                                </div>
+                                <div style={styles.detailsPriceRow}>
+                                    <span style={styles.priceLabel}>Ціна в TON:</span>
+                                    <span style={styles.priceValueTon}>💎 {convertToTon(phone.price)} TON</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style={styles.modalFooter}>
+                            <button 
+                                style={styles.favoriteModalBtn}
+                                onClick={onToggleFavorite}
+                            >
+                                {isFavorite ? '❤️ В обраному' : '🤍 До обраного'}
+                            </button>
+                            <button style={styles.contactModalBtn} onClick={onContact}>
+                                📞 Зв'язатися
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Стили
+        const styles = {
+            container: {
+                fontFamily: '"Manrope", -apple-system, BlinkMacSystemFont, sans-serif',
+                backgroundColor: tg.themeParams.bg_color || '#f8f9fa',
+                color: tg.themeParams.text_color || '#1a1a1a',
+                minHeight: '100vh',
+                paddingBottom: '20px'
+            },
+            stickyHeader: {
+                position: 'sticky',
+                top: 0,
+                backgroundColor: tg.themeParams.bg_color || '#f8f9fa',
+                zIndex: 100,
+                paddingBottom: '12px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+            },
+            header: {
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                padding: '16px 20px',
+                textAlign: 'center',
+                borderRadius: '0 0 16px 16px',
+                marginBottom: '12px'
+            },
+            title: {
+                margin: '0 0 4px 0',
+                fontSize: '20px',
+                fontWeight: '800',
+                letterSpacing: '-0.5px'
+            },
+            subtitle: {
+                margin: 0,
+                fontSize: '13px',
+                opacity: 0.95,
+                fontWeight: '500'
+            },
+            tabs: {
+                display: 'flex',
+                gap: '8px',
+                padding: '0 20px',
+                marginBottom: '12px'
+            },
+            tab: {
+                flex: 1,
+                padding: '10px',
+                border: 'none',
+                borderRadius: '10px',
+                backgroundColor: '#fff',
+                color: '#666',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.06)'
+            },
+            activeTab: {
+                backgroundColor: '#667eea',
+                color: 'white',
+                boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)'
+            },
+            searchContainer: {
+                padding: '0 20px',
+                marginBottom: '8px'
+            },
+            searchInput: {
+                width: '100%',
+                padding: '12px 14px',
+                border: '2px solid #e5e7eb',
+                borderRadius: '10px',
+                fontSize: '18px',
+                outline: 'none',
+                boxSizing: 'border-box',
+                transition: 'border-color 0.2s',
+                fontWeight: '600'
+            },
+            searchInfoRow: {
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: '4px'
+            },
+            searchHint: {
+                fontSize: '13px',
+                color: '#ffffff',
+                fontWeight: '500',
+                textShadow: '0 1px 2px rgba(0,0,0,0.2)'
+            },
+            searchCounter: {
+                fontSize: '12px',
+                color: '#ffffff',
+                fontWeight: '600',
+                textShadow: '0 1px 2px rgba(0,0,0,0.2)'
+            },
+            filtersRow: {
+                display: 'flex',
+                gap: '8px',
+                padding: '0 20px',
+                marginBottom: '8px'
+            },
+            sortSelect: {
+                width: '100%',
+                padding: '12px 38px 12px 10px',
+                border: '2px solid #e5e7eb',
+                borderRadius: '10px',
+                fontSize: '13px',
+                fontWeight: '600',
+                backgroundColor: 'white',
+                cursor: 'pointer',
+                outline: 'none',
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                MozAppearance: 'none',
+                color: 'transparent',
+                height: '48px',
+                boxSizing: 'border-box',
+                backgroundImage: 'none'
+            },
+            sortDisplayText: {
+                position: 'absolute',
+                top: '50%',
+                left: '10px',
+                right: '40px',
+                transform: 'translateY(-50%)',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#1a1a1a',
+                pointerEvents: 'none'
+            },
+            sortArrow: {
+                position: 'absolute',
+                top: '50%',
+                right: '10px',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none',
+                display: 'flex',
+                alignItems: 'center'
+            },
+            priceFilterInput: {
+                flex: '1 1 65%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: 'white',
+                padding: '0 12px',
+                border: '2px solid #e5e7eb',
+                borderRadius: '10px',
+                minWidth: 0,
+                height: '48px',
+                boxSizing: 'border-box'
+            },
+            priceInput: {
+                flex: 1,
+                border: 'none',
+                outline: 'none',
+                fontSize: '16px',
+                fontWeight: '700',
+                padding: '12px 0',
+                minWidth: 0
+            },
+            priceLabel: {
+                fontSize: '15px',
+                fontWeight: '700',
+                color: '#6b7280',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+            },
+            phoneList: {
+                padding: '0 20px 20px 20px',
+                marginTop: '12px'
+            },
+            phoneCard: {
+                backgroundColor: 'white',
+                borderRadius: '12px',
+                padding: '16px',
+                marginBottom: '10px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                cursor: 'pointer',
+                transition: 'transform 0.2s, box-shadow 0.2s'
+            },
+            cardContent: {
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '10px'
+            },
+            phoneNumber: {
+                fontSize: '20px',
+                fontWeight: '800',
+                color: '#1a1a1a',
+                letterSpacing: '-0.3px'
+            },
+            favoriteBtn: {
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                padding: '4px'
+            },
+            priceContainer: {
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingTop: '10px',
+                borderTop: '1px solid #f3f4f6'
+            },
+            priceUah: {
+                fontSize: '18px',
+                fontWeight: '800',
+                color: '#667eea'
+            },
+            priceTon: {
+                fontSize: '14px',
+                fontWeight: '700',
+                color: '#0088cc',
+                backgroundColor: '#e0f2fe',
+                padding: '4px 10px',
+                borderRadius: '6px'
+            },
+            loading: {
+                textAlign: 'center',
+                padding: '40px',
+                fontSize: '15px',
+                color: '#999'
+            },
+            spinner: {
+                width: '40px',
+                height: '40px',
+                margin: '0 auto 16px',
+                border: '4px solid #f0f0f0',
+                borderTop: '4px solid #667eea',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+            },
+            errorContainer: {
+                textAlign: 'center',
+                padding: '60px 20px',
+                maxWidth: '400px',
+                margin: '0 auto'
+            },
+            errorIcon: {
+                fontSize: '64px',
+                marginBottom: '20px'
+            },
+            errorTitle: {
+                fontSize: '24px',
+                fontWeight: 'bold',
+                marginBottom: '12px',
+                color: '#1a1a1a'
+            },
+            errorText: {
+                fontSize: '16px',
+                color: '#666',
+                marginBottom: '24px',
+                lineHeight: '1.5'
+            },
+            retryBtn: {
+                padding: '14px 32px',
+                backgroundColor: '#667eea',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '16px',
+                fontWeight: '600',
+                cursor: 'pointer'
+            },
+            noResults: {
+                textAlign: 'center',
+                padding: '40px 20px',
+                color: '#999'
+            },
+            noResultsHint: {
+                fontSize: '14px',
+                marginTop: '8px'
+            },
+            modal: {
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                display: 'flex',
+                alignItems: 'flex-end',
+                zIndex: 1000
+            },
+            modalContent: {
+                backgroundColor: 'white',
+                borderRadius: '20px 20px 0 0',
+                width: '100%',
+                overflow: 'hidden'
+            },
+            modalHeader: {
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '20px',
+                borderBottom: '1px solid #f0f0f0'
+            },
+            modalTitle: {
+                margin: 0,
+                fontSize: '20px',
+                fontWeight: 'bold'
+            },
+            closeBtn: {
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                padding: '4px',
+                color: '#999'
+            },
+            modalBody: {
+                padding: '10px 20px'
+            },
+            detailsNumber: {
+                fontSize: '26px',
+                fontWeight: 'bold',
+                color: '#1a1a1a',
+                marginBottom: '8px'
+            },
+            detailsOperator: {
+                fontSize: '15px',
+                color: '#666',
+                marginBottom: '20px'
+            },
+            detailsSection: {
+                marginBottom: '20px'
+            },
+            sectionTitle: {
+                fontSize: '16px',
+                fontWeight: '600',
+                marginBottom: '8px',
+                color: '#1a1a1a'
+            },
+            sectionText: {
+                fontSize: '14px',
+                color: '#666',
+                lineHeight: '1.5'
+            },
+            features: {
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '6px'
+            },
+            featureTag: {
+                padding: '4px 10px',
+                backgroundColor: '#f0f0f0',
+                borderRadius: '6px',
+                fontSize: '12px',
+                color: '#555'
+            },
+            detailsPriceBox: {
+                padding: '16px',
+                backgroundColor: '#f8f9fa',
+                borderRadius: '12px',
+                marginTop: '12px'
+            },
+            detailsPriceRow: {
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px'
+            },
+            priceLabel: {
+                fontSize: '14px',
+                color: '#666',
+                fontWeight: '600'
+            },
+            priceValueUah: {
+                fontSize: '22px',
+                fontWeight: 'bold',
+                color: '#667eea'
+            },
+            priceValueTon: {
+                fontSize: '18px',
+                fontWeight: 'bold',
+                color: '#0088cc'
+            },
+            modalFooter: {
+                padding: '20px',
+                display: 'flex',
+                gap: '10px',
+                borderTop: '1px solid #f0f0f0'
+            },
+            favoriteModalBtn: {
+                flex: 1,
+                padding: '14px',
+                border: '2px solid #667eea',
+                borderRadius: '12px',
+                backgroundColor: 'white',
+                color: '#667eea',
+                fontSize: '15px',
+                fontWeight: '600',
+                cursor: 'pointer'
+            },
+            contactModalBtn: {
+                flex: 1,
+                padding: '14px',
+                border: 'none',
+                borderRadius: '12px',
+                backgroundColor: '#667eea',
+                color: 'white',
+                fontSize: '15px',
+                fontWeight: '600',
+                cursor: 'pointer'
+            }
+        };
+
+        // CSS анимация
+        const styleSheet = document.createElement("style");
+        styleSheet.textContent = `
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            
+            input[type="number"]::-webkit-inner-spin-button,
+            input[type="number"]::-webkit-outer-spin-button {
+                -webkit-appearance: none;
+                margin: 0;
+            }
+            
+            input[type="number"] {
+                -moz-appearance: textfield;
+            }
+            
+            /* Стили для увеличения галочки в select */
+            select option:checked {
+                font-weight: 700;
+            }
+            
+            select {
+                appearance: none !important;
+                -webkit-appearance: none !important;
+                -moz-appearance: none !important;
+            }
+            
+            select::-ms-expand {
+                display: none;
+            }
+        `;
+        document.head.appendChild(styleSheet);
+
+        // Рендер приложения
+        ReactDOM.render(<PhoneMarketplace />, document.getElementById('root'));
+    </script>
+</body>
+</html>
