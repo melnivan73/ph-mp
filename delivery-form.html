@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Дані для відправки</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #17212b;
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .title {
+            font-size: 24px;
+            font-weight: 800;
+            margin: 0 0 8px 0;
+            color: #ffffff;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: #a0aec0;
+            margin: 0;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #ffffff;
+        }
+
+        .input {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 16px;
+            border: 2px solid #2d3748;
+            border-radius: 12px;
+            background-color: #1a252f;
+            color: #ffffff;
+            outline: none;
+            transition: border-color 0.2s;
+            font-family: 'Manrope', sans-serif;
+        }
+
+        .input:focus {
+            border-color: #667eea;
+        }
+
+        .input::placeholder {
+            color: #4a5568;
+        }
+
+        .input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .autocomplete-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: #1a252f;
+            border: 2px solid #2d3748;
+            border-radius: 12px;
+            margin-top: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+
+        .autocomplete-list.show {
+            display: block;
+        }
+
+        .autocomplete-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #2d3748;
+            font-size: 14px;
+            color: #ffffff;
+        }
+
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        .autocomplete-item:hover {
+            background-color: #2d3748;
+        }
+
+        .autocomplete-item-main {
+            font-weight: 600;
+        }
+
+        .autocomplete-item-sub {
+            font-size: 12px;
+            color: #a0aec0;
+            margin-top: 4px;
+        }
+
+        .loading-text {
+            font-size: 12px;
+            color: #a0aec0;
+            margin-top: 4px;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            font-size: 16px;
+            font-weight: 700;
+            color: white;
+            background-color: #667eea;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 10px;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            background-color: #5568d3;
+            transform: translateY(-1px);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .error-message {
+            display: none;
+            padding: 12px 16px;
+            background-color: #fee2e2;
+            color: #991b1b;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .success-box {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .success-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .success-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: #ffffff;
+        }
+
+        .success-text {
+            font-size: 16px;
+            color: #a0aec0;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .close-btn {
+            padding: 14px 32px;
+            background-color: #667eea;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        select.input {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffffff' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            padding-right: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        const API_URL = 'https://ph-mp-api.vercel.app';
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const orderId = urlParams.get('orderId');
+
+        const root = document.getElementById('root');
+
+        let selectedCity = null;
+        let citiesTimeout = null;
+
+        if (!orderId) {
+            root.innerHTML = '<div class="container"><div style="text-align:center;padding:60px 20px"><h2>❌ Помилка</h2><p>ID замовлення не знайдено</p></div></div>';
+        } else {
+            renderForm();
+        }
+
+        function renderForm() {
+            root.innerHTML = '<div class="container"><div class="header"><h1 class="title">📦 Дані для відправки</h1><p class="subtitle">Заповніть форму для відправки Новою Поштою</p></div><form id="deliveryForm"><div class="form-group"><label class="label">Телефон *</label><input type="tel" id="phone" name="phone" placeholder="+380 XX XXX XX XX" required class="input" /></div><div class="form-group"><label class="label">Прізвище *</label><input type="text" id="lastName" name="lastName" placeholder="Введіть прізвище" required class="input" /></div><div class="form-group"><label class="label">Ім\'я *</label><input type="text" id="firstName" name="firstName" placeholder="Введіть ім\'я" required class="input" /></div><div class="form-group"><label class="label">Місто *</label><input type="text" id="city" name="city" placeholder="Почніть вводити назву міста" required class="input" autocomplete="off" /><div id="cityLoading" class="loading-text" style="display:none">Завантаження...</div><div id="cityList" class="autocomplete-list"></div></div><div class="form-group"><label class="label">Область *</label><input type="text" id="region" name="region" placeholder="Автоматично заповниться" required class="input" readonly style="opacity:0.7" /></div><div class="form-group"><label class="label">Район</label><input type="text" id="district" name="district" placeholder="Автоматично заповниться" class="input" readonly style="opacity:0.7" /></div><div class="form-group"><label class="label">Склад Нової Пошти № *</label><select id="warehouse" name="warehouse" required class="input" disabled><option value="">Спочатку оберіть місто</option></select><div id="warehouseLoading" class="loading-text" style="display:none">Завантаження складів...</div></div><div id="errorMessage" class="error-message"></div><button type="submit" id="submitBtn" class="submit-btn">Відправити дані</button></form></div>';
+
+            setupAutocomplete();
+            document.getElementById('deliveryForm').addEventListener('submit', handleSubmit);
+        }
+
+        function setupAutocomplete() {
+            const cityInput = document.getElementById('city');
+            const cityList = document.getElementById('cityList');
+            const cityLoading = document.getElementById('cityLoading');
+            const regionInput = document.getElementById('region');
+            const districtInput = document.getElementById('district');
+            const warehouseSelect = document.getElementById('warehouse');
+            const warehouseLoading = document.getElementById('warehouseLoading');
+
+            cityInput.addEventListener('input', async (e) => {
+                const query = e.target.value.trim();
+                
+                if (query.length < 2) {
+                    cityList.classList.remove('show');
+                    cityList.innerHTML = '';
+                    return;
+                }
+
+                clearTimeout(citiesTimeout);
+                citiesTimeout = setTimeout(async () => {
+                    cityLoading.style.display = 'block';
+                    
+                    try {
+                        const response = await fetch(API_URL + '/api/np-cities', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ query })
+                        });
+
+                        const result = await response.json();
+                        
+                        if (result.success && result.data.length > 0) {
+                            cityList.innerHTML = result.data.map(city => 
+                                '<div class="autocomplete-item" data-ref="' + city.ref + '" data-area="' + city.area + '" data-region="' + city.region + '" data-name="' + city.mainDescription + '"><div class="autocomplete-item-main">' + city.mainDescription + '</div><div class="autocomplete-item-sub">' + city.presentName + '</div></div>'
+                            ).join('');
+                            
+                            cityList.classList.add('show');
+                            
+                            cityList.querySelectorAll('.autocomplete-item').forEach(item => {
+                                item.addEventListener('click', () => {
+                                    const cityName = item.getAttribute('data-name');
+                                    const cityRef = item.getAttribute('data-ref');
+                                    const area = item.getAttribute('data-area');
+                                    const region = item.getAttribute('data-region');
+                                    
+                                    cityInput.value = cityName;
+                                    regionInput.value = area;
+                                    districtInput.value = region;
+                                    
+                                    selectedCity = { ref: cityRef, name: cityName };
+                                    
+                                    cityList.classList.remove('show');
+                                    cityList.innerHTML = '';
+                                    
+                                    loadWarehouses(cityRef);
+                                });
+                            });
+                        } else {
+                            cityList.innerHTML = '<div class="autocomplete-item">Міста не знайдено</div>';
+                            cityList.classList.add('show');
+                        }
+                    } catch (error) {
+                        console.error('Error loading cities:', error);
+                    } finally {
+                        cityLoading.style.display = 'none';
+                    }
+                }, 500);
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!cityInput.contains(e.target) && !cityList.contains(e.target)) {
+                    cityList.classList.remove('show');
+                }
+            });
+
+            async function loadWarehouses(cityRef) {
+                warehouseLoading.style.display = 'block';
+                warehouseSelect.disabled = true;
+                warehouseSelect.innerHTML = '<option value="">Завантаження...</option>';
+                
+                try {
+                    const response = await fetch(API_URL + '/api/np-warehouses', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ cityRef })
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.success && result.data.length > 0) {
+                        warehouseSelect.innerHTML = '<option value="">Оберіть відділення</option>' + 
+                            result.data.map(wh => '<option value="' + wh.number + '">' + wh.description + '</option>').join('');
+                        warehouseSelect.disabled = false;
+                    } else {
+                        warehouseSelect.innerHTML = '<option value="">Відділення не знайдено</option>';
+                    }
+                } catch (error) {
+                    console.error('Error loading warehouses:', error);
+                    warehouseSelect.innerHTML = '<option value="">Помилка завантаження</option>';
+                } finally {
+                    warehouseLoading.style.display = 'none';
+                }
+            }
+        }
+
+        async function handleSubmit(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            const formData = new FormData(e.target);
+            const data = {
+                orderId: orderId,
+                phone: formData.get('phone'),
+                lastName: formData.get('lastName'),
+                firstName: formData.get('firstName'),
+                city: formData.get('city'),
+                region: formData.get('region'),
+                district: formData.get('district'),
+                warehouse: formData.get('warehouse')
+            };
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Відправка...';
+            errorMessage.classList.remove('show');
+            errorMessage.textContent = '';
+
+            try {
+                const response = await fetch(API_URL + '/api/delivery-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    root.innerHTML = '<div class="container"><div class="success-box"><div class="success-icon">✅</div><h2 class="success-title">Дані відправлено!</h2><p class="success-text">Тепер оберіть спосіб оплати в чаті з ботом</p><button class="close-btn" onclick="window.Telegram.WebApp.close()">Закрити</button></div></div>';
+                } else {
+                    throw new Error(result.error || 'Помилка відправки');
+                }
+
+            } catch (error) {
+                console.error('Помилка:', error);
+                errorMessage.textContent = error.message || 'Помилка відправки даних. Спробуйте ще раз.';
+                errorMessage.classList.add('show');
+                
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Відправити дані';
+            }
+        }
+    </script>
+</body>
+</html>
