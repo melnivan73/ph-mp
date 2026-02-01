@@ -289,7 +289,7 @@
         </button>
 
         <button id="cancelButton" class="cancel-btn">
-            Скасувати замовлення
+            ← Повернутися до вибору оплати
         </button>
     </div>
 
@@ -459,9 +459,9 @@
             }, 5000); // Проверяем каждые 5 секунд
         }
 
-        // Отмена заказа
+        // Отмена оплаты TON
         async function cancelOrder() {
-            if (!confirm('Ви впевнені, що хочете скасувати замовлення?')) {
+            if (!confirm('Повернутися до вибору способу оплати?')) {
                 return;
             }
 
@@ -475,13 +475,13 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showStatus('✅ Замовлення скасовано', 'success');
-                    setTimeout(() => tg.close(), 2000);
+                    showStatus('✅ Повертаємось до вибору оплати...', 'success');
+                    setTimeout(() => tg.close(), 1500);
                 } else {
                     throw new Error(result.error);
                 }
             } catch (error) {
-                showStatus('❌ Помилка скасування', 'error');
+                showStatus('❌ Помилка', 'error');
             }
         }
 
