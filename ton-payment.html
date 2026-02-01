@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Оплата TON</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #17212b;
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .title {
+            font-size: 24px;
+            font-weight: 800;
+            margin: 0 0 8px 0;
+            color: #ffffff;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: #a0aec0;
+            margin: 0;
+        }
+
+        .order-info {
+            background: #1a252f;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .order-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #2d3748;
+        }
+
+        .order-row:last-child {
+            border-bottom: none;
+        }
+
+        .order-label {
+            font-size: 14px;
+            color: #a0aec0;
+        }
+
+        .order-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #ffffff;
+            text-align: right;
+        }
+
+        .order-value.highlight {
+            color: #667eea;
+            font-size: 18px;
+        }
+
+        .discount-badge {
+            display: inline-block;
+            background: #10b981;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-left: 8px;
+        }
+
+        .wallet-section {
+            background: #1a252f;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .wallet-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #ffffff;
+        }
+
+        #ton-connect-button {
+            margin: 0 auto;
+        }
+
+        .payment-btn {
+            width: 100%;
+            padding: 16px;
+            font-size: 16px;
+            font-weight: 700;
+            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 10px;
+        }
+
+        .payment-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .payment-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background: #4a5568;
+        }
+
+        .status-message {
+            display: none;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .status-message.show {
+            display: block;
+        }
+
+        .status-message.info {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .status-message.success {
+            background: #10b981;
+            color: white;
+        }
+
+        .status-message.error {
+            background: #ef4444;
+            color: white;
+        }
+
+        .status-message.warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .instruction-box {
+            background: #2d3748;
+            border-left: 4px solid #667eea;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .instruction-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+
+        .instruction-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .instruction-list li {
+            font-size: 13px;
+            color: #a0aec0;
+            padding: 6px 0;
+            padding-left: 24px;
+            position: relative;
+        }
+
+        .instruction-list li:before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #10b981;
+            font-weight: 700;
+        }
+
+        .cancel-btn {
+            width: 100%;
+            padding: 14px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #ef4444;
+            background: transparent;
+            border: 2px solid #ef4444;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 12px;
+        }
+
+        .cancel-btn:hover {
+            background: #ef4444;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">💎 Оплата TON</h1>
+            <p class="subtitle">Підключіть гаманець та здійсніть оплату</p>
+        </div>
+
+        <div id="statusMessage" class="status-message"></div>
+
+        <div class="order-info">
+            <div class="order-row">
+                <span class="order-label">📱 Номер:</span>
+                <span class="order-value" id="phoneNumber">-</span>
+            </div>
+            <div class="order-row">
+                <span class="order-label">💰 Ціна:</span>
+                <span class="order-value" id="priceUAH">-</span>
+            </div>
+            <div class="order-row">
+                <span class="order-label">📌 Курс TON:</span>
+                <span class="order-value" id="tonRate">-</span>
+            </div>
+            <div class="order-row">
+                <span class="order-label">💎 До сплати:</span>
+                <span class="order-value highlight" id="priceTON">
+                    - <span class="discount-badge">-5%</span>
+                </span>
+            </div>
+        </div>
+
+        <div class="instruction-box">
+            <div class="instruction-title">⚡ Як оплатити:</div>
+            <ul class="instruction-list">
+                <li>Підключіть TON гаманець</li>
+                <li>Натисніть "Оплатити"</li>
+                <li>Підтвердіть транзакцію у гаманці</li>
+                <li>Очікуйте автоматичне підтвердження</li>
+            </ul>
+        </div>
+
+        <div class="wallet-section">
+            <div class="wallet-title">Підключення гаманця</div>
+            <div id="ton-connect-button"></div>
+        </div>
+
+        <button id="payButton" class="payment-btn" disabled>
+            💎 Оплатити <span id="payAmount">-</span> TON
+        </button>
+
+        <button id="cancelButton" class="cancel-btn">
+            Скасувати замовлення
+        </button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        const API_URL = 'https://ph-mp-api.vercel.app';
+        const MERCHANT_WALLET = 'UQA3soK4ABEWcsjblRdxW2bBd8Wgfli4WjURqr4p3s-eHpx5';
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const orderId = urlParams.get('orderId');
+
+        let orderData = null;
+        let tonConnectUI = null;
+        let checkInterval = null;
+
+        // Инициализация TON Connect
+        async function initTonConnect() {
+            tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+                manifestUrl: 'https://ph-mp.vercel.app/tonconnect-manifest.json',
+                buttonRootId: 'ton-connect-button'
+            });
+
+            tonConnectUI.onStatusChange(wallet => {
+                if (wallet) {
+                    showStatus('✅ Гаманець підключено', 'success');
+                    document.getElementById('payButton').disabled = false;
+                } else {
+                    document.getElementById('payButton').disabled = true;
+                }
+            });
+        }
+
+        // Загрузка данных заказа
+        async function loadOrderData() {
+            try {
+                const response = await fetch(`${API_URL}/api/order-details/${orderId}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    orderData = result.data;
+                    displayOrderInfo();
+                } else {
+                    showStatus('❌ Замовлення не знайдено', 'error');
+                }
+            } catch (error) {
+                showStatus('❌ Помилка завантаження даних', 'error');
+                console.error(error);
+            }
+        }
+
+        // Отображение информации о заказе
+        function displayOrderInfo() {
+            const phonesList = orderData.phones.map(p => p.number).join(', ');
+            document.getElementById('phoneNumber').textContent = phonesList;
+            document.getElementById('priceUAH').textContent = `${orderData.totalUah.toLocaleString('uk-UA')} грн`;
+            document.getElementById('tonRate').textContent = `${orderData.tonRate.toFixed(2)} UAH`;
+            document.getElementById('priceTON').innerHTML = `${orderData.totalTonWithDiscount} TON <span class="discount-badge">-5%</span>`;
+            document.getElementById('payAmount').textContent = orderData.totalTonWithDiscount;
+        }
+
+        // Отправка платежа
+        async function sendPayment() {
+            if (!tonConnectUI.wallet) {
+                showStatus('❌ Спочатку підключіть гаманець', 'error');
+                return;
+            }
+
+            const payButton = document.getElementById('payButton');
+            payButton.disabled = true;
+            payButton.innerHTML = '<span class="loading-spinner"></span>Очікування підтвердження...';
+
+            try {
+                // Конвертируем TON в nanotons (1 TON = 1,000,000,000 nanotons)
+                const amountNano = Math.floor(orderData.totalTonWithDiscount * 1000000000);
+
+                const transaction = {
+                    validUntil: Math.floor(Date.now() / 1000) + 600, // 10 минут
+                    messages: [
+                        {
+                            address: MERCHANT_WALLET,
+                            amount: amountNano.toString(),
+                            payload: btoa(`order_${orderId}`) // Комментарий для идентификации
+                        }
+                    ]
+                };
+
+                showStatus('⏳ Підтвердіть транзакцію у гаманці...', 'info');
+
+                const result = await tonConnectUI.sendTransaction(transaction);
+                
+                if (result) {
+                    showStatus('✅ Транзакція відправлена! Очікуємо підтвердження...', 'success');
+                    
+                    // Уведомляем backend о транзакции
+                    await notifyBackend(result.boc);
+                    
+                    // Начинаем проверку транзакции
+                    startTransactionCheck();
+                } else {
+                    throw new Error('Транзакцію скасовано');
+                }
+
+            } catch (error) {
+                console.error('Payment error:', error);
+                showStatus(`❌ ${error.message || 'Помилка оплати'}`, 'error');
+                payButton.disabled = false;
+                payButton.innerHTML = `💎 Оплатити ${orderData.totalTonWithDiscount} TON`;
+            }
+        }
+
+        // Уведомление backend о транзакции
+        async function notifyBackend(boc) {
+            try {
+                await fetch(`${API_URL}/api/ton-transaction`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        orderId: orderId,
+                        boc: boc,
+                        wallet: tonConnectUI.wallet.account.address
+                    })
+                });
+            } catch (error) {
+                console.error('Failed to notify backend:', error);
+            }
+        }
+
+        // Проверка транзакции на backend
+        function startTransactionCheck() {
+            let attempts = 0;
+            const maxAttempts = 60; // 5 минут (каждые 5 секунд)
+
+            checkInterval = setInterval(async () => {
+                attempts++;
+
+                try {
+                    const response = await fetch(`${API_URL}/api/check-ton-payment/${orderId}`);
+                    const result = await response.json();
+
+                    if (result.success && result.confirmed) {
+                        clearInterval(checkInterval);
+                        showStatus('🎉 Оплата підтверджена! Замовлення прийнято.', 'success');
+                        
+                        setTimeout(() => {
+                            tg.close();
+                        }, 3000);
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(checkInterval);
+                        showStatus('⏰ Час очікування вичерпано. Зв\'яжіться з менеджером.', 'warning');
+                    }
+                } catch (error) {
+                    console.error('Check error:', error);
+                }
+            }, 5000); // Проверяем каждые 5 секунд
+        }
+
+        // Отмена заказа
+        async function cancelOrder() {
+            if (!confirm('Ви впевнені, що хочете скасувати замовлення?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/cancel-order`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orderId: orderId })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showStatus('✅ Замовлення скасовано', 'success');
+                    setTimeout(() => tg.close(), 2000);
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                showStatus('❌ Помилка скасування', 'error');
+            }
+        }
+
+        // Показать статус
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.className = `status-message show ${type}`;
+        }
+
+        // Инициализация
+        if (!orderId) {
+            showStatus('❌ ID замовлення не знайдено', 'error');
+        } else {
+            initTonConnect();
+            loadOrderData();
+
+            document.getElementById('payButton').addEventListener('click', sendPayment);
+            document.getElementById('cancelButton').addEventListener('click', cancelOrder);
+        }
+
+        // Очистка при закрытии
+        window.addEventListener('beforeunload', () => {
+            if (checkInterval) {
+                clearInterval(checkInterval);
+            }
+        });
+    </script>
+</body>
+</html>
