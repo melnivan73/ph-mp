@@ -224,9 +224,9 @@
             padding: 14px;
             font-size: 14px;
             font-weight: 600;
-            color: #ef4444;
-            background: transparent;
-            border: 2px solid #ef4444;
+            color: #ffffff;
+            background: #10b981;
+            border: 2px solid #10b981;
             border-radius: 12px;
             cursor: pointer;
             transition: all 0.2s;
@@ -234,8 +234,9 @@
         }
 
         .cancel-btn:hover {
-            background: #ef4444;
-            color: white;
+            background: #059669;
+            border-color: #059669;
+            transform: translateY(-1px);
         }
     </style>
 </head>
@@ -288,8 +289,8 @@
             💎 Оплатити <span id="payAmount">-</span> TON
         </button>
 
-        <button id="cancelButton" class="cancel-btn">
-            ← Повернутися до вибору оплати
+        <button id="cashButton" class="cancel-btn">
+            💵 Оплата при отриманні
         </button>
     </div>
 
@@ -459,14 +460,14 @@
             }, 5000); // Проверяем каждые 5 секунд
         }
 
-        // Отмена оплаты TON
-        async function cancelOrder() {
-            if (!confirm('Повернутися до вибору способу оплати?')) {
+        // Оплата при получении (из TON страницы)
+        async function payByCash() {
+            if (!confirm('Оплата при отриманні?')) {
                 return;
             }
 
             try {
-                const response = await fetch(`${API_URL}/api/cancel-order`, {
+                const response = await fetch(`${API_URL}/api/pay-by-cash`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ orderId: orderId })
@@ -475,7 +476,7 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showStatus('✅ Повертаємось до вибору оплати...', 'success');
+                    showStatus('✅ Замовлення прийнято!', 'success');
                     setTimeout(() => tg.close(), 1500);
                 } else {
                     throw new Error(result.error);
@@ -500,7 +501,7 @@
             loadOrderData();
 
             document.getElementById('payButton').addEventListener('click', sendPayment);
-            document.getElementById('cancelButton').addEventListener('click', cancelOrder);
+            document.getElementById('cashButton').addEventListener('click', payByCash);
         }
 
         // Очистка при закрытии
