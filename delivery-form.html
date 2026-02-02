@@ -313,7 +313,6 @@
                                 placeholder="067-888-88-88" 
                                 required 
                                 class="input"
-                                maxlength="12"
                             />
                             <div id="phoneError" class="phone-error">Введіть коректний номер (10 цифр, формат: 067-888-88-88)</div>
                         </div>
@@ -379,24 +378,29 @@
             phoneInput.addEventListener('input', (e) => {
                 let value = e.target.value.replace(/\D/g, ''); // Убираем все кроме цифр
                 
+                // Ограничиваем до 10 цифр
+                if (value.length > 10) {
+                    value = value.slice(0, 10);
+                }
+                
                 // Автоформатирование: 067-888-88-88
+                let formatted = '';
                 if (value.length > 0) {
                     if (value.length <= 3) {
-                        value = value;
+                        formatted = value;
                     } else if (value.length <= 6) {
-                        value = value.slice(0, 3) + '-' + value.slice(3);
+                        formatted = value.slice(0, 3) + '-' + value.slice(3);
                     } else if (value.length <= 8) {
-                        value = value.slice(0, 3) + '-' + value.slice(3, 6) + '-' + value.slice(6);
+                        formatted = value.slice(0, 3) + '-' + value.slice(3, 6) + '-' + value.slice(6);
                     } else {
-                        value = value.slice(0, 3) + '-' + value.slice(3, 6) + '-' + value.slice(6, 8) + '-' + value.slice(8, 10);
+                        formatted = value.slice(0, 3) + '-' + value.slice(3, 6) + '-' + value.slice(6, 8) + '-' + value.slice(8);
                     }
                 }
                 
-                e.target.value = value;
+                e.target.value = formatted;
                 
                 // Валидация
-                const digitsOnly = value.replace(/\D/g, '');
-                if (digitsOnly.length > 0 && digitsOnly.length !== 10) {
+                if (value.length > 0 && value.length !== 10) {
                     phoneError.classList.add('show');
                     phoneInput.style.borderColor = '#ef4444';
                 } else {
