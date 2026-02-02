@@ -64,7 +64,7 @@
             border: 2px solid #2d3748;
             border-radius: 12px;
             background-color: #1a252f;
-            color: #ffffff;
+            color: #e2e8f0;
             outline: none;
             transition: border-color 0.2s;
             font-family: 'Manrope', sans-serif;
@@ -75,7 +75,7 @@
         }
 
         .input::placeholder {
-            color: #4a5568;
+            color: #718096;
         }
 
         .input:disabled {
@@ -156,6 +156,59 @@
         .submit-btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
+        }
+
+        .payment-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .payment-btn {
+            flex: 1;
+            padding: 16px;
+            font-size: 15px;
+            font-weight: 700;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .payment-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .payment-btn.cash {
+            background-color: #10b981;
+            color: white;
+        }
+
+        .payment-btn.cash:hover:not(:disabled) {
+            background-color: #059669;
+            transform: translateY(-1px);
+        }
+
+        .payment-btn.ton {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .payment-btn.ton:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .phone-error {
+            color: #ef4444;
+            font-size: 12px;
+            margin-top: 4px;
+            display: none;
+        }
+
+        .phone-error.show {
+            display: block;
         }
 
         .error-message {
@@ -243,10 +296,219 @@
         }
 
         function renderForm() {
-            root.innerHTML = '<div class="container"><div class="header"><h1 class="title">📦 Дані для відправки</h1><p class="subtitle">Заповніть форму для відправки Новою Поштою</p></div><form id="deliveryForm"><div class="form-group"><label class="label">Телефон *</label><input type="tel" id="phone" name="phone" placeholder="+380 XX XXX XX XX" required class="input" /></div><div class="form-group"><label class="label">Прізвище *</label><input type="text" id="lastName" name="lastName" placeholder="Введіть прізвище" required class="input" /></div><div class="form-group"><label class="label">Ім\'я *</label><input type="text" id="firstName" name="firstName" placeholder="Введіть ім\'я" required class="input" /></div><div class="form-group"><label class="label">Місто *</label><input type="text" id="city" name="city" placeholder="Почніть вводити назву міста" required class="input" autocomplete="off" /><div id="cityLoading" class="loading-text" style="display:none">Завантаження...</div><div id="cityList" class="autocomplete-list"></div></div><div class="form-group"><label class="label">Область *</label><input type="text" id="region" name="region" placeholder="Автоматично заповниться" required class="input" readonly style="opacity:0.7" /></div><div class="form-group"><label class="label">Район</label><input type="text" id="district" name="district" placeholder="Автоматично заповниться" class="input" readonly style="opacity:0.7" /></div><div class="form-group"><label class="label">Склад Нової Пошти № *</label><select id="warehouse" name="warehouse" required class="input" disabled><option value="">Спочатку оберіть місто</option></select><div id="warehouseLoading" class="loading-text" style="display:none">Завантаження складів...</div></div><div id="errorMessage" class="error-message"></div><button type="submit" id="submitBtn" class="submit-btn">Відправити дані</button></form></div>';
+            root.innerHTML = `
+                <div class="container">
+                    <div class="header">
+                        <h1 class="title">📦 Дані для відправки</h1>
+                        <p class="subtitle">Заповніть форму для відправки Новою Поштою</p>
+                    </div>
+                    
+                    <form id="deliveryForm">
+                        <div class="form-group">
+                            <label class="label">Телефон *</label>
+                            <input 
+                                type="tel" 
+                                id="phone" 
+                                name="phone" 
+                                placeholder="067-888-88-88" 
+                                required 
+                                class="input"
+                                maxlength="12"
+                            />
+                            <div id="phoneError" class="phone-error">Введіть коректний номер (10 цифр, формат: 067-888-88-88)</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="label">Прізвище *</label>
+                            <input type="text" id="lastName" name="lastName" placeholder="Введіть прізвище" required class="input" />
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="label">Ім'я *</label>
+                            <input type="text" id="firstName" name="firstName" placeholder="Введіть ім'я" required class="input" />
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="label">Місто *</label>
+                            <input type="text" id="city" name="city" placeholder="Почніть вводити назву міста" required class="input" autocomplete="off" />
+                            <div id="cityLoading" class="loading-text" style="display:none">Завантаження...</div>
+                            <div id="cityList" class="autocomplete-list"></div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="label">Область *</label>
+                            <input type="text" id="region" name="region" placeholder="Автоматично заповниться" required class="input" readonly style="opacity:0.7" />
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="label">Район</label>
+                            <input type="text" id="district" name="district" placeholder="Автоматично заповниться" class="input" readonly style="opacity:0.7" />
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="label">Склад Нової Пошти № *</label>
+                            <select id="warehouse" name="warehouse" required class="input" disabled>
+                                <option value="">Спочатку оберіть місто</option>
+                            </select>
+                            <div id="warehouseLoading" class="loading-text" style="display:none">Завантаження складів...</div>
+                        </div>
+                        
+                        <div id="errorMessage" class="error-message"></div>
+                        
+                        <div class="payment-buttons">
+                            <button type="button" id="cashBtn" class="payment-btn cash">
+                                💵 Оплата при отриманні
+                            </button>
+                            <button type="button" id="tonBtn" class="payment-btn ton">
+                                💎 Оплата TON -5%
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
 
             setupAutocomplete();
-            document.getElementById('deliveryForm').addEventListener('submit', handleSubmit);
+            setupPhoneValidation();
+            setupPaymentButtons();
+        }
+
+        function setupPhoneValidation() {
+            const phoneInput = document.getElementById('phone');
+            const phoneError = document.getElementById('phoneError');
+
+            phoneInput.addEventListener('input', (e) => {
+                let value = e.target.value.replace(/\D/g, ''); // Убираем все кроме цифр
+                
+                // Автоформатирование: 067-888-88-88
+                if (value.length > 0) {
+                    if (value.length <= 3) {
+                        value = value;
+                    } else if (value.length <= 6) {
+                        value = value.slice(0, 3) + '-' + value.slice(3);
+                    } else if (value.length <= 8) {
+                        value = value.slice(0, 3) + '-' + value.slice(3, 6) + '-' + value.slice(6);
+                    } else {
+                        value = value.slice(0, 3) + '-' + value.slice(3, 6) + '-' + value.slice(6, 8) + '-' + value.slice(8, 10);
+                    }
+                }
+                
+                e.target.value = value;
+                
+                // Валидация
+                const digitsOnly = value.replace(/\D/g, '');
+                if (digitsOnly.length > 0 && digitsOnly.length !== 10) {
+                    phoneError.classList.add('show');
+                    phoneInput.style.borderColor = '#ef4444';
+                } else {
+                    phoneError.classList.remove('show');
+                    phoneInput.style.borderColor = '#2d3748';
+                }
+            });
+
+            phoneInput.addEventListener('blur', (e) => {
+                const digitsOnly = e.target.value.replace(/\D/g, '');
+                if (digitsOnly.length > 0 && digitsOnly.length !== 10) {
+                    phoneError.classList.add('show');
+                    phoneInput.style.borderColor = '#ef4444';
+                }
+            });
+        }
+
+        function setupPaymentButtons() {
+            const cashBtn = document.getElementById('cashBtn');
+            const tonBtn = document.getElementById('tonBtn');
+
+            cashBtn.addEventListener('click', () => handlePayment('cash'));
+            tonBtn.addEventListener('click', () => handlePayment('ton'));
+        }
+
+        async function handlePayment(paymentType) {
+            const phoneInput = document.getElementById('phone');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            // Валидация формы
+            const formData = new FormData(document.getElementById('deliveryForm'));
+            const phone = formData.get('phone');
+            const lastName = formData.get('lastName');
+            const firstName = formData.get('firstName');
+            const city = formData.get('city');
+            const region = formData.get('region');
+            const warehouse = formData.get('warehouse');
+
+            // Проверка всех полей
+            if (!phone || !lastName || !firstName || !city || !region || !warehouse) {
+                errorMessage.textContent = 'Заповніть всі обов\'язкові поля';
+                errorMessage.classList.add('show');
+                return;
+            }
+
+            // Проверка телефона
+            const digitsOnly = phone.replace(/\D/g, '');
+            if (digitsOnly.length !== 10) {
+                errorMessage.textContent = 'Введіть коректний номер телефону (10 цифр)';
+                errorMessage.classList.add('show');
+                phoneInput.style.borderColor = '#ef4444';
+                document.getElementById('phoneError').classList.add('show');
+                return;
+            }
+
+            // Отключаем кнопки
+            const cashBtn = document.getElementById('cashBtn');
+            const tonBtn = document.getElementById('tonBtn');
+            cashBtn.disabled = true;
+            tonBtn.disabled = true;
+            
+            if (paymentType === 'cash') {
+                cashBtn.textContent = 'Відправка...';
+            } else {
+                tonBtn.textContent = 'Відправка...';
+            }
+
+            errorMessage.classList.remove('show');
+
+            try {
+                const data = {
+                    orderId: orderId,
+                    phone: phone,
+                    lastName: lastName,
+                    firstName: firstName,
+                    city: city,
+                    region: region,
+                    district: formData.get('district') || '',
+                    warehouse: warehouse,
+                    paymentType: paymentType
+                };
+
+                const response = await fetch(API_URL + '/api/delivery-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    if (paymentType === 'ton') {
+                        // Перенаправляем на страницу TON оплаты
+                        window.location.href = `https://ph-mp.vercel.app/ton-payment.html?orderId=${orderId}`;
+                    } else {
+                        // Показываем успех для наличных
+                        root.innerHTML = '<div class="container"><div class="success-box"><div class="success-icon">✅</div><h2 class="success-title">Замовлення прийнято!</h2><p class="success-text">Оплата при отриманні.<br>Менеджер зв\'яжеться з вами для підтвердження.</p><button class="close-btn" onclick="window.Telegram.WebApp.close()">Закрити</button></div></div>';
+                    }
+                } else {
+                    throw new Error(result.error || 'Помилка відправки');
+                }
+
+            } catch (error) {
+                console.error('Помилка:', error);
+                errorMessage.textContent = error.message || 'Помилка відправки даних. Спробуйте ще раз.';
+                errorMessage.classList.add('show');
+                
+                cashBtn.disabled = false;
+                tonBtn.disabled = false;
+                cashBtn.textContent = '💵 Оплата при отриманні';
+                tonBtn.textContent = '💎 Оплата TON -5%';
+            }
         }
 
         function setupAutocomplete() {
@@ -354,53 +616,6 @@
             }
         }
 
-        async function handleSubmit(e) {
-            e.preventDefault();
-            
-            const submitBtn = document.getElementById('submitBtn');
-            const errorMessage = document.getElementById('errorMessage');
-            
-            const formData = new FormData(e.target);
-            const data = {
-                orderId: orderId,
-                phone: formData.get('phone'),
-                lastName: formData.get('lastName'),
-                firstName: formData.get('firstName'),
-                city: formData.get('city'),
-                region: formData.get('region'),
-                district: formData.get('district'),
-                warehouse: formData.get('warehouse')
-            };
-
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Відправка...';
-            errorMessage.classList.remove('show');
-            errorMessage.textContent = '';
-
-            try {
-                const response = await fetch(API_URL + '/api/delivery-data', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    root.innerHTML = '<div class="container"><div class="success-box"><div class="success-icon">✅</div><h2 class="success-title">Дані відправлено!</h2><p class="success-text">Тепер оберіть спосіб оплати в чаті з ботом</p><button class="close-btn" onclick="window.Telegram.WebApp.close()">Закрити</button></div></div>';
-                } else {
-                    throw new Error(result.error || 'Помилка відправки');
-                }
-
-            } catch (error) {
-                console.error('Помилка:', error);
-                errorMessage.textContent = error.message || 'Помилка відправки даних. Спробуйте ще раз.';
-                errorMessage.classList.add('show');
-                
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Відправити дані';
-            }
-        }
     </script>
 </body>
 </html>
