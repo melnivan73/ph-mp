@@ -219,48 +219,56 @@
             font-weight: 700;
         }
 
+        /* ВАЖНО: Уведомление должно быть ПОВЕРХ всего */
         .wallet-notice {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 24px;
-            border-radius: 16px;
-            margin-bottom: 24px;
+            padding: 40px 30px;
+            border-radius: 20px;
             text-align: center;
-            animation: pulse 2s infinite;
-            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+            animation: pulseStrong 1.5s infinite;
+            box-shadow: 0 15px 50px rgba(102, 126, 234, 0.9);
+            max-width: 90%;
+            width: 400px;
         }
 
         .notice-icon {
-            font-size: 56px;
-            margin-bottom: 12px;
-            animation: bounce 1s infinite;
+            font-size: 80px;
+            margin-bottom: 20px;
+            animation: bounceStrong 0.8s infinite;
+            display: block;
         }
 
         .notice-text {
-            font-size: 15px;
+            font-size: 16px;
             line-height: 1.8;
         }
 
         .notice-text strong {
-            font-size: 18px;
+            font-size: 22px;
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 15px;
         }
 
-        @keyframes pulse {
+        @keyframes pulseStrong {
             0%, 100% { 
-                transform: scale(1);
-                box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+                transform: translate(-50%, -50%) scale(1);
+                box-shadow: 0 15px 50px rgba(102, 126, 234, 0.9);
             }
             50% { 
-                transform: scale(1.03);
-                box-shadow: 0 12px 40px rgba(102, 126, 234, 0.8);
+                transform: translate(-50%, -50%) scale(1.05);
+                box-shadow: 0 20px 60px rgba(102, 126, 234, 1);
             }
         }
 
-        @keyframes bounce {
+        @keyframes bounceStrong {
             0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-12px); }
+            50% { transform: translateY(-20px); }
         }
 
         .cancel-btn {
@@ -287,9 +295,27 @@
             opacity: 0.6;
             cursor: not-allowed;
         }
+
+        /* Overlay для затемнения фона */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 9998;
+            display: none;
+        }
+
+        .overlay.show {
+            display: block;
+        }
     </style>
 </head>
 <body>
+    <div id="overlay" class="overlay"></div>
+
     <div class="container">
         <div class="header">
             <h1 class="title">💎 Оплата TON</h1>
@@ -325,7 +351,7 @@
                 <li>Підключіть TON гаманець</li>
                 <li>Натисніть "Оплатити"</li>
                 <li>Підтвердіть транзакцію у гаманці</li>
-                <li>⚠️ Якщо скасували - поверніться на цю сторінку</li>
+                <li style="color: #f59e0b;">⚠️ ВАЖЛИВО: При скасуванні - поверніться сюди!</li>
                 <li>Очікуйте автоматичне підтвердження</li>
             </ul>
         </div>
@@ -333,9 +359,11 @@
         <div id="walletNotice" class="wallet-notice" style="display: none;">
             <div class="notice-icon">👆</div>
             <div class="notice-text">
-                <strong>Відкрився гаманець?</strong>
-                Підтвердіть оплату в гаманці.<br><br>
-                <span style="color: #fbbf24; font-weight: 700; font-size: 16px;">⚠️ Якщо скасували - поверніться сюди!</span>
+                <strong>ВІДКРИВСЯ ГАМАНЕЦЬ!</strong>
+                Підтвердіть оплату в гаманці<br><br>
+                <span style="color: #fbbf24; font-weight: 700; font-size: 18px;">
+                    ⚠️ ЯКЩО СКАСУВАЛИ -<br>ПОВЕРНІТЬСЯ СЮДИ!
+                </span>
             </div>
         </div>
 
@@ -368,6 +396,8 @@
         let tonConnectUI = null;
         let checkInterval = null;
 
+        console.log('TON Payment page loaded, orderId:', orderId);
+
         // Инициализация TON Connect
         async function initTonConnect() {
             tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
@@ -377,9 +407,11 @@
 
             tonConnectUI.onStatusChange(wallet => {
                 if (wallet) {
+                    console.log('Wallet connected:', wallet);
                     showStatus('✅ Гаманець підключено', 'success');
                     document.getElementById('payButton').disabled = false;
                 } else {
+                    console.log('Wallet disconnected');
                     document.getElementById('payButton').disabled = true;
                 }
             });
@@ -393,13 +425,14 @@
 
                 if (result.success) {
                     orderData = result.data;
+                    console.log('Order data loaded:', orderData);
                     displayOrderInfo();
                 } else {
                     showStatus('❌ Замовлення не знайдено', 'error');
                 }
             } catch (error) {
                 showStatus('❌ Помилка завантаження даних', 'error');
-                console.error(error);
+                console.error('Load error:', error);
             }
         }
 
@@ -411,6 +444,35 @@
             document.getElementById('tonRate').textContent = `${orderData.tonRate.toFixed(2)} UAH`;
             document.getElementById('priceTON').innerHTML = `${orderData.totalTonWithDiscount} TON <span class="discount-badge">-5%</span>`;
             document.getElementById('payAmount').textContent = orderData.totalTonWithDiscount;
+        }
+
+        // Показать уведомление
+        function showNotice() {
+            const noticeEl = document.getElementById('walletNotice');
+            const overlayEl = document.getElementById('overlay');
+            
+            if (noticeEl && overlayEl) {
+                noticeEl.style.display = 'block';
+                overlayEl.classList.add('show');
+                console.log('✅ NOTICE SHOWN - element displayed');
+                
+                // Принудительно перерисовываем
+                noticeEl.offsetHeight;
+            } else {
+                console.error('❌ Notice or overlay element not found!');
+            }
+        }
+
+        // Скрыть уведомление
+        function hideNotice() {
+            const noticeEl = document.getElementById('walletNotice');
+            const overlayEl = document.getElementById('overlay');
+            
+            if (noticeEl && overlayEl) {
+                noticeEl.style.display = 'none';
+                overlayEl.classList.remove('show');
+                console.log('✅ NOTICE HIDDEN');
+            }
         }
 
         // Отправка платежа
@@ -429,12 +491,14 @@
             payButton.disabled = true;
             payButton.innerHTML = '<span class="loading-spinner"></span>Очікування підтвердження...';
 
+            console.log('🚀 Starting payment process...');
+
             try {
-                // Конвертируем TON в nanotons (1 TON = 1,000,000,000 nanotons)
+                // Конвертируем TON в nanotons
                 const amountNano = Math.floor(orderData.totalTonWithDiscount * 1000000000);
 
                 const transaction = {
-                    validUntil: Math.floor(Date.now() / 1000) + 600, // 10 минут
+                    validUntil: Math.floor(Date.now() / 1000) + 600,
                     messages: [
                         {
                             address: MERCHANT_WALLET,
@@ -445,58 +509,48 @@
 
                 showStatus('⏳ Підтвердіть транзакцію у гаманці...', 'info');
 
-                // Показываем яркое уведомление
-                const noticeEl = document.getElementById('walletNotice');
-                if (noticeEl) {
-                    noticeEl.style.display = 'block';
-                    console.log('Wallet notice shown');
+                // ПОКАЗЫВАЕМ УВЕДОМЛЕНИЕ ПРИНУДИТЕЛЬНО
+                console.log('📢 Attempting to show notice...');
+                showNotice();
+
+                // Предотвращаем закрытие
+                try {
+                    tg.enableClosingConfirmation();
+                    console.log('✅ Closing confirmation enabled');
+                } catch (e) {
+                    console.log('⚠️ Could not enable closing confirmation:', e);
                 }
 
-                // Предотвращаем автозакрытие WebApp
-                tg.enableClosingConfirmation();
-                console.log('Closing confirmation enabled');
-
-                // Используем Promise.race для отслеживания отмены
-                const timeoutPromise = new Promise((_, reject) => {
-                    setTimeout(() => reject(new Error('timeout')), 120000); // 2 минуты таймаут
-                });
-
-                const result = await Promise.race([
-                    tonConnectUI.sendTransaction(transaction),
-                    timeoutPromise
-                ]);
+                // Отправляем транзакцию
+                console.log('💎 Sending transaction...');
+                const result = await tonConnectUI.sendTransaction(transaction);
                 
+                console.log('📥 Transaction result:', result);
+
                 if (result) {
-                    // Скрываем уведомление
-                    if (noticeEl) {
-                        noticeEl.style.display = 'none';
-                    }
+                    hideNotice();
                     
-                    tg.disableClosingConfirmation();
+                    try {
+                        tg.disableClosingConfirmation();
+                    } catch (e) {}
+                    
                     showStatus('✅ Транзакція відправлена! Очікуємо підтвердження...', 'success');
                     
-                    // Уведомляем backend о транзакции
                     await notifyBackend(result.boc);
-                    
-                    // Начинаем проверку транзакции
                     startTransactionCheck();
                 } else {
                     throw new Error('Транзакцію скасовано');
                 }
 
             } catch (error) {
-                console.error('Payment error:', error);
+                console.error('❌ Payment error:', error);
                 
-                // Скрываем уведомление
-                const noticeEl = document.getElementById('walletNotice');
-                if (noticeEl) {
-                    noticeEl.style.display = 'none';
-                }
-
-                // Разрешаем закрытие WebApp
-                tg.disableClosingConfirmation();
+                hideNotice();
                 
-                // Проверяем тип ошибки
+                try {
+                    tg.disableClosingConfirmation();
+                } catch (e) {}
+                
                 const errorMsg = error.message || '';
                 
                 if (errorMsg.includes('User rejects') || 
@@ -505,13 +559,10 @@
                     errorMsg.includes('скасовано') ||
                     errorMsg.includes('declined')) {
                     showStatus('⚠️ Транзакцію скасовано. Спробуйте ще раз або оберіть оплату при отриманні.', 'warning');
-                } else if (errorMsg.includes('timeout')) {
-                    showStatus('⏰ Час очікування вичерпано. Спробуйте ще раз.', 'warning');
                 } else {
                     showStatus(`❌ ${errorMsg || 'Помилка оплати. Спробуйте ще раз'}`, 'error');
                 }
                 
-                // НЕ закрываем окно - даем возможность попробовать снова
                 payButton.disabled = false;
                 payButton.innerHTML = `💎 Оплатити ${orderData.totalTonWithDiscount} TON`;
             }
@@ -537,7 +588,7 @@
         // Проверка транзакции на backend
         function startTransactionCheck() {
             let attempts = 0;
-            const maxAttempts = 60; // 5 минут (каждые 5 секунд)
+            const maxAttempts = 60;
 
             checkInterval = setInterval(async () => {
                 attempts++;
@@ -560,10 +611,10 @@
                 } catch (error) {
                     console.error('Check error:', error);
                 }
-            }, 5000); // Проверяем каждые 5 секунд
+            }, 5000);
         }
 
-        // Оплата при получении (из TON страницы)
+        // Оплата при получении
         async function payByCash() {
             if (!confirm('Оплата при отриманні?')) {
                 return;
@@ -619,6 +670,12 @@
                 clearInterval(checkInterval);
             }
         });
+
+        // Тест: показать уведомление через 2 секунды для проверки
+        // setTimeout(() => {
+        //     console.log('🧪 TEST: Showing notice...');
+        //     showNotice();
+        // }, 2000);
     </script>
 </body>
 </html>
