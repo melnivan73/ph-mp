@@ -219,6 +219,44 @@
             font-weight: 700;
         }
 
+        .wallet-notice {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+            animation: pulse 2s infinite;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .notice-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+            animation: bounce 1s infinite;
+        }
+
+        .notice-text {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        @keyframes pulse {
+            0%, 100% { 
+                transform: scale(1);
+                box-shadow: 0 4px 20px rgba(102, 126, 234, 0.5);
+            }
+            50% { 
+                transform: scale(1.02);
+                box-shadow: 0 6px 30px rgba(102, 126, 234, 0.7);
+            }
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
         .cancel-btn {
             width: 100%;
             padding: 14px;
@@ -281,8 +319,18 @@
                 <li>Підключіть TON гаманець</li>
                 <li>Натисніть "Оплатити"</li>
                 <li>Підтвердіть транзакцію у гаманці</li>
+                <li>⚠️ Якщо скасували - поверніться на цю сторінку</li>
                 <li>Очікуйте автоматичне підтвердження</li>
             </ul>
+        </div>
+
+        <div id="walletNotice" class="wallet-notice" style="display: none;">
+            <div class="notice-icon">👆</div>
+            <div class="notice-text">
+                <strong>Відкрився гаманець?</strong><br>
+                Підтвердіть оплату в гаманці.<br>
+                <span style="color: #fbbf24; font-weight: 700;">⚠️ Якщо скасували - поверніться на цю сторінку</span>
+            </div>
         </div>
 
         <div class="wallet-section">
@@ -390,10 +438,22 @@
                 };
 
                 showStatus('⏳ Підтвердіть транзакцію у гаманці...', 'info');
+                
+                // Показываем яркое уведомление
+                document.getElementById('walletNotice').style.display = 'block';
 
-                const result = await tonConnectUI.sendTransaction(transaction);
+                // Используем Promise.race для отслеживания отмены
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('timeout')), 120000); // 2 минуты таймаут
+                });
+
+                const result = await Promise.race([
+                    tonConnectUI.sendTransaction(transaction),
+                    timeoutPromise
+                ]);
                 
                 if (result) {
+                    document.getElementById('walletNotice').style.display = 'none';
                     showStatus('✅ Транзакція відправлена! Очікуємо підтвердження...', 'success');
                     
                     // Уведомляем backend о транзакции
@@ -408,13 +468,22 @@
             } catch (error) {
                 console.error('Payment error:', error);
                 
+                // Скрываем уведомление
+                document.getElementById('walletNotice').style.display = 'none';
+                
                 // Проверяем тип ошибки
                 const errorMsg = error.message || '';
                 
-                if (errorMsg.includes('cancelled') || errorMsg.includes('rejected') || errorMsg.includes('скасовано')) {
+                if (errorMsg.includes('User rejects') || 
+                    errorMsg.includes('cancelled') || 
+                    errorMsg.includes('rejected') || 
+                    errorMsg.includes('скасовано') ||
+                    errorMsg.includes('declined')) {
                     showStatus('⚠️ Транзакцію скасовано. Спробуйте ще раз або оберіть оплату при отриманні.', 'warning');
+                } else if (errorMsg.includes('timeout')) {
+                    showStatus('⏰ Час очікування вичерпано. Спробуйте ще раз.', 'warning');
                 } else {
-                    showStatus(`❌ Помилка: ${errorMsg || 'Спробуйте ще раз'}`, 'error');
+                    showStatus(`❌ ${errorMsg || 'Помилка оплати. Спробуйте ще раз'}`, 'error');
                 }
                 
                 // НЕ закрываем окно - даем возможность попробовать снова
