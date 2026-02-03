@@ -218,104 +218,9 @@
             color: #10b981;
             font-weight: 700;
         }
-
-        /* Фиолетовое уведомление */
-        .wallet-notice {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 9999;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 40px 30px;
-            border-radius: 20px;
-            text-align: center;
-            animation: pulseStrong 1.5s infinite;
-            box-shadow: 0 15px 50px rgba(102, 126, 234, 0.9);
-            max-width: 90%;
-            width: 400px;
-        }
-
-        .notice-icon {
-            font-size: 80px;
-            margin-bottom: 20px;
-            animation: bounceStrong 0.8s infinite;
-            display: block;
-        }
-
-        .notice-text {
-            font-size: 16px;
-            line-height: 1.8;
-        }
-
-        .notice-text strong {
-            font-size: 22px;
-            display: block;
-            margin-bottom: 15px;
-        }
-
-        @keyframes pulseStrong {
-            0%, 100% { 
-                transform: translate(-50%, -50%) scale(1);
-                box-shadow: 0 15px 50px rgba(102, 126, 234, 0.9);
-            }
-            50% { 
-                transform: translate(-50%, -50%) scale(1.05);
-                box-shadow: 0 20px 60px rgba(102, 126, 234, 1);
-            }
-        }
-
-        @keyframes bounceStrong {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-20px); }
-        }
-
-        .cancel-btn {
-            width: 100%;
-            padding: 14px;
-            font-size: 14px;
-            font-weight: 600;
-            color: #ffffff;
-            background: #10b981;
-            border: 2px solid #10b981;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-            margin-top: 12px;
-        }
-
-        .cancel-btn:hover:not(:disabled) {
-            background: #059669;
-            border-color: #059669;
-            transform: translateY(-1px);
-        }
-
-        .cancel-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        /* Overlay для затемнения фона */
-        .overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            z-index: 9998;
-            display: none;
-        }
-
-        .overlay.show {
-            display: block;
-        }
     </style>
 </head>
 <body>
-    <div id="overlay" class="overlay"></div>
-
     <div class="container">
         <div class="header">
             <h1 class="title">💎 Оплата TON</h1>
@@ -351,20 +256,8 @@
                 <li>Підключіть TON гаманець</li>
                 <li>Натисніть "Оплатити"</li>
                 <li>Підтвердіть транзакцію у гаманці</li>
-                <li style="color: #f59e0b;">⚠️ ВАЖЛИВО: При скасуванні - поверніться сюди!</li>
                 <li>Очікуйте автоматичне підтвердження</li>
             </ul>
-        </div>
-
-        <div id="walletNotice" class="wallet-notice" style="display: none;">
-            <div class="notice-icon">👆</div>
-            <div class="notice-text">
-                <strong>ВІДКРИВСЯ ГАМАНЕЦЬ!</strong>
-                Підтвердіть оплату в гаманці<br><br>
-                <span style="color: #fbbf24; font-weight: 700; font-size: 18px;">
-                    ⚠️ ЯКЩО СКАСУВАЛИ -<br>ПОВЕРНІТЬСЯ СЮДИ!
-                </span>
-            </div>
         </div>
 
         <div class="wallet-section">
@@ -374,10 +267,6 @@
 
         <button id="payButton" class="payment-btn" disabled>
             💎 Оплатити <span id="payAmount">-</span> TON
-        </button>
-
-        <button id="cashButton" class="cancel-btn">
-            💵 Оплата при отриманні
         </button>
     </div>
 
@@ -446,30 +335,6 @@
             document.getElementById('payAmount').textContent = orderData.totalTonWithDiscount;
         }
 
-        // Показать уведомление
-        function showNotice() {
-            const noticeEl = document.getElementById('walletNotice');
-            const overlayEl = document.getElementById('overlay');
-            
-            if (noticeEl && overlayEl) {
-                noticeEl.style.display = 'block';
-                overlayEl.classList.add('show');
-                console.log('✅ NOTICE SHOWN');
-            }
-        }
-
-        // Скрыть уведомление
-        function hideNotice() {
-            const noticeEl = document.getElementById('walletNotice');
-            const overlayEl = document.getElementById('overlay');
-            
-            if (noticeEl && overlayEl) {
-                noticeEl.style.display = 'none';
-                overlayEl.classList.remove('show');
-                console.log('✅ NOTICE HIDDEN');
-            }
-        }
-
         // Отправка платежа
         async function sendPayment() {
             if (!tonConnectUI.wallet) {
@@ -501,40 +366,14 @@
                     ]
                 };
 
-                showStatus('⏳ Відкриваємо гаманець...', 'info');
-
-                // Предотвращаем закрытие
-                try {
-                    tg.enableClosingConfirmation();
-                    console.log('✅ Closing confirmation enabled');
-                } catch (e) {
-                    console.log('⚠️ Could not enable closing confirmation:', e);
-                }
+                showStatus('⏳ Підтвердіть транзакцію у гаманці...', 'info');
 
                 console.log('💎 Sending transaction...');
-                
-                // Начинаем отправку транзакции
-                const transactionPromise = tonConnectUI.sendTransaction(transaction);
-                
-                // Показываем уведомление через 500ms после начала отправки
-                // (кошелек уже должен открыться к этому времени)
-                setTimeout(() => {
-                    console.log('📢 Showing notice after delay...');
-                    showNotice();
-                    showStatus('⏳ Підтвердіть транзакцію у гаманці...', 'info');
-                }, 500);
-                
-                const result = await transactionPromise;
+                const result = await tonConnectUI.sendTransaction(transaction);
                 
                 console.log('📥 Transaction result:', result);
 
                 if (result) {
-                    hideNotice();
-                    
-                    try {
-                        tg.disableClosingConfirmation();
-                    } catch (e) {}
-                    
                     showStatus('✅ Транзакція відправлена! Очікуємо підтвердження...', 'success');
                     
                     await notifyBackend(result.boc);
@@ -546,26 +385,15 @@
             } catch (error) {
                 console.error('❌ Payment error:', error);
                 
-                hideNotice();
-                
-                try {
-                    tg.disableClosingConfirmation();
-                } catch (e) {}
-                
                 const errorMsg = error.message || '';
                 
-                if (errorMsg.includes('User rejects') || 
-                    errorMsg.includes('cancelled') || 
-                    errorMsg.includes('rejected') || 
-                    errorMsg.includes('скасовано') ||
-                    errorMsg.includes('declined')) {
-                    showStatus('⚠️ Транзакцію скасовано. Спробуйте ще раз або оберіть оплату при отриманні.', 'warning');
-                } else {
-                    showStatus(`❌ ${errorMsg || 'Помилка оплати. Спробуйте ще раз'}`, 'error');
-                }
+                // При любой ошибке - уведомляем backend об отмене
+                await notifyPaymentCancelled();
                 
-                payButton.disabled = false;
-                payButton.innerHTML = `💎 Оплатити ${orderData.totalTonWithDiscount} TON`;
+                // Закрываем WebApp - вернется в бот
+                setTimeout(() => {
+                    tg.close();
+                }, 1000);
             }
         }
 
@@ -583,6 +411,22 @@
                 });
             } catch (error) {
                 console.error('Failed to notify backend:', error);
+            }
+        }
+
+        // Уведомление об отмене оплаты
+        async function notifyPaymentCancelled() {
+            try {
+                await fetch(`${API_URL}/api/ton-payment-cancelled`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        orderId: orderId
+                    })
+                });
+                console.log('✅ Payment cancellation notified');
+            } catch (error) {
+                console.error('Failed to notify cancellation:', error);
             }
         }
 
@@ -615,38 +459,6 @@
             }, 5000);
         }
 
-        // Оплата при получении
-        async function payByCash() {
-            if (!confirm('Оплата при отриманні?')) {
-                return;
-            }
-
-            const cashButton = document.getElementById('cashButton');
-            cashButton.disabled = true;
-            cashButton.textContent = 'Обробка...';
-
-            try {
-                const response = await fetch(`${API_URL}/api/pay-by-cash`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ orderId: orderId })
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    showStatus('✅ Замовлення прийнято! Оплата при отриманні.', 'success');
-                    setTimeout(() => tg.close(), 2000);
-                } else {
-                    throw new Error(result.error);
-                }
-            } catch (error) {
-                showStatus('❌ Помилка: ' + (error.message || 'Спробуйте ще раз'), 'error');
-                cashButton.disabled = false;
-                cashButton.textContent = '💵 Оплата при отриманні';
-            }
-        }
-
         // Показать статус
         function showStatus(message, type) {
             const statusEl = document.getElementById('statusMessage');
@@ -662,7 +474,6 @@
             loadOrderData();
 
             document.getElementById('payButton').addEventListener('click', sendPayment);
-            document.getElementById('cashButton').addEventListener('click', payByCash);
         }
 
         // Очистка при закрытии
