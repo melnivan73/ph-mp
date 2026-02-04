@@ -313,7 +313,7 @@
         let orderData = null;
         let tonConnectUI = null;
         let checkInterval = null;
-        let paymentStarted = false;
+        let paymentCompleted = false;
 
         console.log('TON Payment page loaded, orderId:', orderId);
 
@@ -381,7 +381,6 @@
             payButton.disabled = true;
             payButton.innerHTML = '<span class="loading-spinner"></span>Відправка...';
 
-            paymentStarted = true;
             console.log('🚀 Starting payment process...');
 
             try {
@@ -405,7 +404,7 @@
                 console.log('📥 Transaction result:', result);
 
                 if (result) {
-                    paymentStarted = false;
+                    paymentCompleted = true;
                     showStatus('✅ Транзакція відправлена! Очікуємо підтвердження...', 'success');
                     
                     await notifyBackend(result.boc);
@@ -416,16 +415,14 @@
 
             } catch (error) {
                 console.error('❌ Payment error:', error);
-                paymentStarted = false;
                 
-                // Уведомляем backend об отмене
-                await notifyPaymentCancelled();
+                // Используем sendBeacon для гарантированной отправки
+                notifyPaymentCancelledBeacon();
                 
                 // Закрываем WebApp
-                showStatus('❌ Повертаємось до бота...', 'warning');
                 setTimeout(() => {
                     tg.close();
-                }, 1000);
+                }, 500);
             }
         }
 
@@ -449,6 +446,7 @@
                 const result = await response.json();
 
                 if (result.success) {
+                    paymentCompleted = true;
                     showStatus('✅ Замовлення прийнято! Оплата при отриманні.', 'success');
                     setTimeout(() => tg.close(), 2000);
                 } else {
@@ -478,21 +476,22 @@
             }
         }
 
-        // Уведомление об отмене оплаты
-        async function notifyPaymentCancelled() {
-            try {
-                console.log('📤 Notifying payment cancellation...');
-                const response = await fetch(`${API_URL}/api/ton-payment-cancelled`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        orderId: orderId
-                    })
-                });
-                const result = await response.json();
-                console.log('✅ Cancellation notified:', result);
-            } catch (error) {
-                console.error('❌ Failed to notify cancellation:', error);
+        // Уведомление об отмене используя sendBeacon (гарантированная доставка)
+        function notifyPaymentCancelledBeacon() {
+            console.log('📤 Sending cancellation via sendBeacon...');
+            const data = JSON.stringify({ orderId: orderId });
+            const blob = new Blob([data], { type: 'application/json' });
+            
+            if (navigator.sendBeacon) {
+                const sent = navigator.sendBeacon(`${API_URL}/api/ton-payment-cancelled`, blob);
+                console.log('✅ SendBeacon result:', sent);
+            } else {
+                // Fallback для старых браузеров
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', `${API_URL}/api/ton-payment-cancelled`, false); // Синхронный запрос
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.send(data);
+                console.log('✅ Sync XHR sent');
             }
         }
 
@@ -510,6 +509,7 @@
 
                     if (result.success && result.confirmed) {
                         clearInterval(checkInterval);
+                        paymentCompleted = true;
                         showStatus('🎉 Оплата підтверджена! Замовлення прийнято.', 'success');
                         
                         setTimeout(() => {
@@ -532,39 +532,23 @@
             statusEl.className = `status-message show ${type}`;
         }
 
-        // Отслеживание закрытия страницы
+        // Обработка закрытия страницы
         window.addEventListener('beforeunload', () => {
+            console.log('🔄 Page unloading, paymentCompleted:', paymentCompleted);
             if (checkInterval) {
                 clearInterval(checkInterval);
             }
-            // Если оплата была начата но не завершена - уведомляем об отмене
-            if (paymentStarted) {
-                notifyPaymentCancelled();
+            // Если оплата не завершена - отправляем уведомление об отмене
+            if (!paymentCompleted) {
+                notifyPaymentCancelledBeacon();
             }
         });
 
-        // Отслеживание потери фокуса (возврат из кошелька)
-        let blurTime = 0;
-        window.addEventListener('blur', () => {
-            blurTime = Date.now();
-            console.log('🔄 Window lost focus (wallet opened?)');
-        });
-
-        window.addEventListener('focus', async () => {
-            const focusTime = Date.now();
-            const elapsed = focusTime - blurTime;
-            
-            console.log(`🔄 Window focused after ${elapsed}ms`);
-            
-            // Если вернулись быстро (меньше 3 секунд) и оплата была начата
-            if (elapsed < 3000 && paymentStarted) {
-                console.log('⚠️ Quick return detected - likely cancelled');
-                paymentStarted = false;
-                await notifyPaymentCancelled();
-                showStatus('❌ Повертаємось до бота...', 'warning');
-                setTimeout(() => {
-                    tg.close();
-                }, 1000);
+        // Обработка pagehide (более надежное событие для мобильных)
+        window.addEventListener('pagehide', () => {
+            console.log('🔄 Page hiding, paymentCompleted:', paymentCompleted);
+            if (!paymentCompleted) {
+                notifyPaymentCancelledBeacon();
             }
         });
 
