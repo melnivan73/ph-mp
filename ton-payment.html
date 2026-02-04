@@ -135,6 +135,31 @@
             background: #4a5568;
         }
 
+        .cancel-btn {
+            width: 100%;
+            padding: 14px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #ffffff;
+            background: #10b981;
+            border: 2px solid #10b981;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 12px;
+        }
+
+        .cancel-btn:hover:not(:disabled) {
+            background: #059669;
+            border-color: #059669;
+            transform: translateY(-1px);
+        }
+
+        .cancel-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .status-message {
             display: none;
             padding: 16px;
@@ -268,6 +293,10 @@
         <button id="payButton" class="payment-btn" disabled>
             💎 Оплатити <span id="payAmount">-</span> TON
         </button>
+
+        <button id="cashButton" class="cancel-btn">
+            💵 Оплата при отриманні
+        </button>
     </div>
 
     <script>
@@ -284,6 +313,7 @@
         let orderData = null;
         let tonConnectUI = null;
         let checkInterval = null;
+        let paymentStarted = false;
 
         console.log('TON Payment page loaded, orderId:', orderId);
 
@@ -351,6 +381,7 @@
             payButton.disabled = true;
             payButton.innerHTML = '<span class="loading-spinner"></span>Відправка...';
 
+            paymentStarted = true;
             console.log('🚀 Starting payment process...');
 
             try {
@@ -374,6 +405,7 @@
                 console.log('📥 Transaction result:', result);
 
                 if (result) {
+                    paymentStarted = false;
                     showStatus('✅ Транзакція відправлена! Очікуємо підтвердження...', 'success');
                     
                     await notifyBackend(result.boc);
@@ -384,16 +416,48 @@
 
             } catch (error) {
                 console.error('❌ Payment error:', error);
+                paymentStarted = false;
                 
-                const errorMsg = error.message || '';
-                
-                // При любой ошибке - уведомляем backend об отмене
+                // Уведомляем backend об отмене
                 await notifyPaymentCancelled();
                 
-                // Закрываем WebApp - вернется в бот
+                // Закрываем WebApp
+                showStatus('❌ Повертаємось до бота...', 'warning');
                 setTimeout(() => {
                     tg.close();
                 }, 1000);
+            }
+        }
+
+        // Оплата при получении
+        async function payByCash() {
+            if (!confirm('Оплата при отриманні?')) {
+                return;
+            }
+
+            const cashButton = document.getElementById('cashButton');
+            cashButton.disabled = true;
+            cashButton.textContent = 'Обробка...';
+
+            try {
+                const response = await fetch(`${API_URL}/api/pay-by-cash`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orderId: orderId })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showStatus('✅ Замовлення прийнято! Оплата при отриманні.', 'success');
+                    setTimeout(() => tg.close(), 2000);
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                showStatus('❌ Помилка: ' + (error.message || 'Спробуйте ще раз'), 'error');
+                cashButton.disabled = false;
+                cashButton.textContent = '💵 Оплата при отриманні';
             }
         }
 
@@ -417,16 +481,18 @@
         // Уведомление об отмене оплаты
         async function notifyPaymentCancelled() {
             try {
-                await fetch(`${API_URL}/api/ton-payment-cancelled`, {
+                console.log('📤 Notifying payment cancellation...');
+                const response = await fetch(`${API_URL}/api/ton-payment-cancelled`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         orderId: orderId
                     })
                 });
-                console.log('✅ Payment cancellation notified');
+                const result = await response.json();
+                console.log('✅ Cancellation notified:', result);
             } catch (error) {
-                console.error('Failed to notify cancellation:', error);
+                console.error('❌ Failed to notify cancellation:', error);
             }
         }
 
@@ -466,6 +532,42 @@
             statusEl.className = `status-message show ${type}`;
         }
 
+        // Отслеживание закрытия страницы
+        window.addEventListener('beforeunload', () => {
+            if (checkInterval) {
+                clearInterval(checkInterval);
+            }
+            // Если оплата была начата но не завершена - уведомляем об отмене
+            if (paymentStarted) {
+                notifyPaymentCancelled();
+            }
+        });
+
+        // Отслеживание потери фокуса (возврат из кошелька)
+        let blurTime = 0;
+        window.addEventListener('blur', () => {
+            blurTime = Date.now();
+            console.log('🔄 Window lost focus (wallet opened?)');
+        });
+
+        window.addEventListener('focus', async () => {
+            const focusTime = Date.now();
+            const elapsed = focusTime - blurTime;
+            
+            console.log(`🔄 Window focused after ${elapsed}ms`);
+            
+            // Если вернулись быстро (меньше 3 секунд) и оплата была начата
+            if (elapsed < 3000 && paymentStarted) {
+                console.log('⚠️ Quick return detected - likely cancelled');
+                paymentStarted = false;
+                await notifyPaymentCancelled();
+                showStatus('❌ Повертаємось до бота...', 'warning');
+                setTimeout(() => {
+                    tg.close();
+                }, 1000);
+            }
+        });
+
         // Инициализация
         if (!orderId) {
             showStatus('❌ ID замовлення не знайдено', 'error');
@@ -474,14 +576,8 @@
             loadOrderData();
 
             document.getElementById('payButton').addEventListener('click', sendPayment);
+            document.getElementById('cashButton').addEventListener('click', payByCash);
         }
-
-        // Очистка при закрытии
-        window.addEventListener('beforeunload', () => {
-            if (checkInterval) {
-                clearInterval(checkInterval);
-            }
-        });
     </script>
 </body>
 </html>
