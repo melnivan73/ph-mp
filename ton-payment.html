@@ -416,8 +416,8 @@
             } catch (error) {
                 console.error('❌ Payment error:', error);
                 
-                // Используем sendBeacon для гарантированной отправки
-                notifyPaymentCancelledBeacon();
+                // Используем обычный fetch с keepalive
+                await notifyPaymentCancelled();
                 
                 // Закрываем WebApp
                 setTimeout(() => {
@@ -476,7 +476,26 @@
             }
         }
 
-        // Уведомление об отмене используя sendBeacon (гарантированная доставка)
+        // Уведомление об отмене - сначала пробуем fetch, потом sendBeacon
+        async function notifyPaymentCancelled() {
+            console.log('📤 Notifying payment cancellation...');
+            try {
+                const response = await fetch(`${API_URL}/api/ton-payment-cancelled`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orderId: orderId }),
+                    keepalive: true // Важно для отправки при закрытии страницы
+                });
+                const result = await response.json();
+                console.log('✅ Cancellation notified via fetch:', result);
+                return true;
+            } catch (error) {
+                console.error('❌ Fetch failed, trying sendBeacon...', error);
+                return notifyPaymentCancelledBeacon();
+            }
+        }
+
+        // Уведомление об отмене используя sendBeacon (fallback)
         function notifyPaymentCancelledBeacon() {
             console.log('📤 Sending cancellation via sendBeacon...');
             const data = JSON.stringify({ orderId: orderId });
@@ -485,13 +504,20 @@
             if (navigator.sendBeacon) {
                 const sent = navigator.sendBeacon(`${API_URL}/api/ton-payment-cancelled`, blob);
                 console.log('✅ SendBeacon result:', sent);
+                return sent;
             } else {
                 // Fallback для старых браузеров
-                const xhr = new XMLHttpRequest();
-                xhr.open('POST', `${API_URL}/api/ton-payment-cancelled`, false); // Синхронный запрос
-                xhr.setRequestHeader('Content-Type', 'application/json');
-                xhr.send(data);
-                console.log('✅ Sync XHR sent');
+                try {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', `${API_URL}/api/ton-payment-cancelled`, false);
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+                    xhr.send(data);
+                    console.log('✅ Sync XHR sent');
+                    return true;
+                } catch (e) {
+                    console.error('❌ XHR failed:', e);
+                    return false;
+                }
             }
         }
 
@@ -533,13 +559,14 @@
         }
 
         // Обработка закрытия страницы
-        window.addEventListener('beforeunload', () => {
+        window.addEventListener('beforeunload', (e) => {
             console.log('🔄 Page unloading, paymentCompleted:', paymentCompleted);
             if (checkInterval) {
                 clearInterval(checkInterval);
             }
             // Если оплата не завершена - отправляем уведомление об отмене
             if (!paymentCompleted) {
+                // Используем sendBeacon для beforeunload так как async не работает
                 notifyPaymentCancelledBeacon();
             }
         });
