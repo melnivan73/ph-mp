@@ -254,7 +254,7 @@
                     const targetCount = parseInt(sameDigitsFilter);
                     filtered = filtered.filter(p => {
                         const maxCount = countMaxSameDigits(p.number);
-                        return maxCount >= targetCount;
+                        return maxCount === targetCount;
                     });
                 }
 
