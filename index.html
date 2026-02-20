@@ -18,15 +18,17 @@
 
         // Безопасная инициализация Telegram WebApp
         let tg = null;
+        let tgInitialized = false;
 
         function initTg() {
           if (window.Telegram && window.Telegram.WebApp) {
             tg = window.Telegram.WebApp;
             tg.ready();
             tg.expand();
+            tgInitialized = true;
             console.log('✅ Telegram WebApp initialized');
           } else {
-            console.warn('⚠️ Telegram not ready, retrying...');
+            console.warn('⏳ Waiting for Telegram WebApp...');
             setTimeout(initTg, 200);
           }
         }
@@ -300,24 +302,20 @@
 
             // Функция отправки заказа
             const handleOrder = async (phonesToOrder) => {
-                console.log('🚀 handleOrder called');
-                
-                // Ждем пока tg инициализируется (максимум 10 секунд)
-                let attempts = 0;
-                while (!tg && attempts < 100) {
-                    console.log('⏳ Waiting for tg... attempt', attempts);
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    attempts++;
+                // Короткое ожидание если tg еще инициализируется (максимум 2 сек)
+                if (!tg) {
+                    let attempts = 0;
+                    while (!tgInitialized && attempts < 20) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        attempts++;
+                    }
                 }
                 
                 if (!tg) {
-                    console.error('❌ tg failed to initialize after 10 seconds');
-                    alert('Помилка ініціалізації Telegram.\nПерезавантажте додаток.');
-                    setOrderError('Telegram не готовий. Перезавантажте додаток.');
+                    alert('Telegram ще не готовий.\nПочекайте секунду та спробуйте ще раз.');
+                    setOrderError('Telegram не готовий.');
                     return;
                 }
-                
-                console.log('✅ tg ready');
                 
                 try {
                     setOrdering(true);
