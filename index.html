@@ -16,16 +16,58 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // Инициализация Telegram WebApp
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.ready();
+        // Безопасная инициализация Telegram WebApp
+        let tg = null;
+
+        function initTg() {
+          if (window.Telegram && window.Telegram.WebApp) {
+            tg = window.Telegram.WebApp;
+            tg.ready();
+            tg.expand();
+            console.log('✅ Telegram WebApp initialized');
+          } else {
+            console.warn('⚠️ Telegram not ready, retrying...');
+            setTimeout(initTg, 200);
+          }
+        }
+
+        // Запускаем инициализацию
+        initTg();
 
         // Конфигурация API
         const API_URL = 'https://ph-mp-api.vercel.app';
         
         // Курс TON к UAH (будет загружаться с API)
-        const DEFAULT_TON_RATE = 180;
+        const DEFAULT_TON_RATE = 64;
+
+        // Функция определения оператора по коду номера
+        function getOperatorByCode(phoneNumber) {
+            // Извлекаем код из скобок, например из "+380 (67) 777-88-99" берем "67"
+            const match = phoneNumber.match(/\((\d+)\)/);
+            const code = match ? match[1] : '';
+            
+            // Если код 2-значный, добавляем 0 в начало для сопоставления
+            const fullCode = code.length === 2 ? '0' + code : code;
+            
+            const operatorCodes = {
+                '068': 'Kyivstar',
+                '098': 'Kyivstar',
+                '096': 'Kyivstar',
+                '067': 'Kyivstar',
+                '097': 'Kyivstar',
+                '077': 'Kyivstar',
+                '063': 'lifecell',
+                '093': 'lifecell',
+                '073': 'lifecell',
+                '066': 'Vodafone',
+                '050': 'Vodafone',
+                '095': 'Vodafone',
+                '075': 'Vodafone',
+                '099': 'Vodafone'
+            };
+            
+            return operatorCodes[fullCode] || 'Невідомий оператор';
+        }
 
         // Хук debounce для оптимизации
         function useDebounce(value, delay) {
@@ -49,7 +91,11 @@
             const [phones, setPhones] = useState([]);
             const [filteredPhones, setFilteredPhones] = useState([]);
             const [searchQuery, setSearchQuery] = useState('');
-            const [favorites, setFavorites] = useState([]);
+            const [favorites, setFavorites] = useState(() => {
+                // Загружаем избранное из localStorage при инициализации
+                const saved = localStorage.getItem('favorites');
+                return saved ? JSON.parse(saved) : [];
+            });
             const [selectedPhone, setSelectedPhone] = useState(null);
             const [activeTab, setActiveTab] = useState('catalog');
             const [loading, setLoading] = useState(true);
@@ -57,6 +103,16 @@
             const [sortBy, setSortBy] = useState('cheap');
             const [maxPriceInput, setMaxPriceInput] = useState('');
             const [tonRate, setTonRate] = useState(DEFAULT_TON_RATE);
+            const [selectedForOrder, setSelectedForOrder] = useState([]);
+            const [orderError, setOrderError] = useState('');
+            const [ordering, setOrdering] = useState(false);
+            const [sameDigitsFilter, setSameDigitsFilter] = useState('all'); // 'all', '5', '6', '7'
+            
+            // Короткие названия для отображения в select
+            const sortLabels = {
+                cheap: 'Дешевше',
+                expensive: 'Дорожче'
+            };
 
             // Debounced значения для оптимизации
             const debouncedSearch = useDebounce(searchQuery, 300);
@@ -71,6 +127,11 @@
                 const interval = setInterval(loadTonRate, 60 * 60 * 1000);
                 return () => clearInterval(interval);
             }, []);
+
+            // Сохранение избранного в localStorage
+            useEffect(() => {
+                localStorage.setItem('favorites', JSON.stringify(favorites));
+            }, [favorites]);
 
             async function loadPhones() {
                 try {
@@ -120,6 +181,20 @@
                 return digits.slice(-7);
             };
 
+            // Подсчёт максимального количества одинаковых цифр в последних 7
+            const countMaxSameDigits = (number) => {
+                const lastSeven = getLastSevenDigits(number);
+                const digitCounts = {};
+                
+                // Подсчитываем частоту каждой цифры
+                for (let digit of lastSeven) {
+                    digitCounts[digit] = (digitCounts[digit] || 0) + 1;
+                }
+                
+                // Возвращаем максимальное количество
+                return Math.max(...Object.values(digitCounts));
+            };
+
             // Поиск с поддержкой маски * (любая цифра) - ИСПРАВЛЕННАЯ ВЕРСИЯ
             const matchesWildcard = (pattern, text) => {
                 // Удаляем все нецифровые символы кроме *
@@ -166,6 +241,15 @@
                     });
                 }
 
+                // Фильтр по количеству одинаковых цифр
+                if (sameDigitsFilter !== 'all') {
+                    const targetCount = parseInt(sameDigitsFilter);
+                    filtered = filtered.filter(p => {
+                        const maxCount = countMaxSameDigits(p.number);
+                        return maxCount === targetCount;
+                    });
+                }
+
                 // Фильтр по максимальной цене
                 if (debouncedMaxPrice) {
                     const maxPriceValue = parseInt(debouncedMaxPrice);
@@ -182,7 +266,7 @@
                 }
 
                 setFilteredPhones(filtered);
-            }, [phones, debouncedSearch, sortBy, debouncedMaxPrice]);
+            }, [phones, debouncedSearch, sortBy, debouncedMaxPrice, sameDigitsFilter]);
 
             // Счётчик найденных номеров
             const searchCounter = useMemo(() => {
@@ -200,6 +284,10 @@
 
             // Контакт с продавцом
             const contactSeller = (phone) => {
+                if (!tg) {
+                    console.warn('tg not initialized yet');
+                    return;
+                }
                 const message = `Вітаю! Цікавить номер ${phone.number} за ${phone.price.toLocaleString('uk-UA')} грн.`;
                 tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(message)}`);
             };
@@ -208,6 +296,108 @@
             const convertToTon = (priceUah) => {
                 const tonValue = priceUah / tonRate;
                 return Math.round(tonValue);
+            };
+
+            // Функция отправки заказа
+            const handleOrder = async (phonesToOrder) => {
+                console.log('🚀 handleOrder called');
+                
+                // Ждем пока tg инициализируется (максимум 10 секунд)
+                let attempts = 0;
+                while (!tg && attempts < 100) {
+                    console.log('⏳ Waiting for tg... attempt', attempts);
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    attempts++;
+                }
+                
+                if (!tg) {
+                    console.error('❌ tg failed to initialize after 10 seconds');
+                    alert('Помилка ініціалізації Telegram.\nПерезавантажте додаток.');
+                    setOrderError('Telegram не готовий. Перезавантажте додаток.');
+                    return;
+                }
+                
+                console.log('✅ tg ready');
+                
+                try {
+                    setOrdering(true);
+                    setOrderError('');
+
+                    let user = tg.initDataUnsafe?.user;
+                    let userId = user?.id;
+                    let username = user?.username;
+                    
+                    // Fallback - парсим initData
+                    if (!userId && tg.initData) {
+                        try {
+                            const params = new URLSearchParams(tg.initData);
+                            const userStr = params.get('user');
+                            if (userStr) {
+                                const userData = JSON.parse(decodeURIComponent(userStr));
+                                userId = userData.id;
+                                username = userData.username;
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse initData:', e);
+                        }
+                    }
+                    
+                    const orderData = {
+                        phones: phonesToOrder,
+                        username: username || 'невідомий',
+                        userId: userId
+                    };
+                    
+                    const response = await fetch(`${API_URL}/api/order`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(orderData)
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        alert('✅ Замовлення відправлено!\n\nОчікуйте відповіді менеджера.');
+                        setSelectedForOrder([]);
+                        if (selectedPhone) setSelectedPhone(null);
+                    } else {
+                        throw new Error(data.error || 'Помилка відправки');
+                    }
+
+                } catch (error) {
+                    console.error('❌ Помилка замовлення:', error);
+                    setOrderError(error.message || 'Помилка при відправці замовлення. Спробуйте ще раз.');
+                } finally {
+                    setOrdering(false);
+                }
+            };
+
+            // Переключение выбора номера для заказа
+            const toggleSelectForOrder = (phoneId) => {
+                setSelectedForOrder(prev =>
+                    prev.includes(phoneId)
+                        ? prev.filter(id => id !== phoneId)
+                        : [...prev, phoneId]
+                );
+            };
+
+            // Заказ выбранных номеров из Обране
+            const orderSelected = () => {
+                console.log('🛒 orderSelected called');
+                console.log('📋 selectedForOrder:', selectedForOrder);
+                
+                if (selectedForOrder.length === 0) {
+                    console.warn('⚠️ No phones selected');
+                    setOrderError('Оберіть хоча б один номер');
+                    setTimeout(() => setOrderError(''), 3000);
+                    return;
+                }
+
+                const phonesToOrder = phones.filter(p => selectedForOrder.includes(p.id));
+                console.log('📱 Phones to order:', phonesToOrder);
+                handleOrder(phonesToOrder);
             };
 
             // Обработка ошибок
@@ -264,25 +454,35 @@
                                         maxLength={7}
                                         style={styles.searchInput}
                                     />
-                                    <div style={styles.searchHint}>* будь-яка цифра</div>
-                                    <div style={styles.searchCounter}>{searchCounter}</div>
+                                    <div style={styles.searchInfoRow}>
+                                        <div style={styles.searchHint}><span style={{fontSize: '18px', verticalAlign: 'middle', lineHeight: '13px'}}>*</span> - будь-яка цифра</div>
+                                        <div style={styles.searchCounter}>{searchCounter}</div>
+                                    </div>
                                 </div>
 
                                 {/* Сортировка и фильтр по цене в одной строке */}
                                 <div style={styles.filtersRow}>
-                                    <select 
-                                        style={styles.sortSelect}
-                                        value={sortBy}
-                                        onChange={(e) => setSortBy(e.target.value)}
-                                    >
-                                        <option value="cheap">Спочатку дешевше</option>
-                                        <option value="expensive">Спочатку дорожче</option>
-                                    </select>
+                                    <div style={{position: 'relative', flex: '0 0 35%'}}>
+                                        <select 
+                                            style={styles.sortSelect}
+                                            value={sortBy}
+                                            onChange={(e) => setSortBy(e.target.value)}
+                                        >
+                                            <option value="cheap">Спочатку дешевше</option>
+                                            <option value="expensive">Спочатку дорожче</option>
+                                        </select>
+                                        <div style={styles.sortDisplayText}>{sortLabels[sortBy]}</div>
+                                        <div style={styles.sortArrow}>
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M4 9l8 8 8-8" stroke="#667eea" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                                            </svg>
+                                        </div>
+                                    </div>
 
                                     <div style={styles.priceFilterInput}>
                                         <input
                                             type="number"
-                                            placeholder="Макс. ціна"
+                                            placeholder="Обмежити ціну"
                                             value={maxPriceInput}
                                             onChange={(e) => {
                                                 const value = e.target.value;
@@ -294,6 +494,49 @@
                                             style={styles.priceInput}
                                         />
                                         <span style={styles.priceLabel}>грн.</span>
+                                    </div>
+                                </div>
+
+                                {/* Фильтр по одинаковым цифрам */}
+                                <div style={styles.sameDigitsFilter}>
+                                    <div style={styles.sameDigitsLabel}>однакових в номері</div>
+                                    <div style={styles.sameDigitsButtons}>
+                                        <button
+                                            style={{
+                                                ...styles.sameDigitsBtn,
+                                                ...(sameDigitsFilter === 'all' ? styles.sameDigitsBtnActive : {})
+                                            }}
+                                            onClick={() => setSameDigitsFilter('all')}
+                                        >
+                                            всі
+                                        </button>
+                                        <button
+                                            style={{
+                                                ...styles.sameDigitsBtn,
+                                                ...(sameDigitsFilter === '5' ? styles.sameDigitsBtnActive : {})
+                                            }}
+                                            onClick={() => setSameDigitsFilter('5')}
+                                        >
+                                            5
+                                        </button>
+                                        <button
+                                            style={{
+                                                ...styles.sameDigitsBtn,
+                                                ...(sameDigitsFilter === '6' ? styles.sameDigitsBtnActive : {})
+                                            }}
+                                            onClick={() => setSameDigitsFilter('6')}
+                                        >
+                                            6
+                                        </button>
+                                        <button
+                                            style={{
+                                                ...styles.sameDigitsBtn,
+                                                ...(sameDigitsFilter === '7' ? styles.sameDigitsBtnActive : {})
+                                            }}
+                                            onClick={() => setSameDigitsFilter('7')}
+                                        >
+                                            7
+                                        </button>
                                     </div>
                                 </div>
                             </>
@@ -329,20 +572,68 @@
                         )
                     ) : (
                         <div style={styles.phoneList}>
+                            {/* Заголовок с инструкцией */}
+                            {phones.filter(p => favorites.includes(p.id)).length > 0 && (
+                                <div style={styles.orderInstruction}>
+                                    Позначте номери для замовлення
+                                </div>
+                            )}
+
+                            {/* Ошибка */}
+                            {orderError && (
+                                <div style={styles.orderError}>
+                                    {orderError}
+                                </div>
+                            )}
+
+                            {/* Список избранных с чекбоксами */}
                             {phones.filter(p => favorites.includes(p.id)).map(phone => (
-                                <PhoneCard
-                                    key={phone.id}
-                                    phone={phone}
-                                    isFavorite={true}
-                                    onToggleFavorite={() => toggleFavorite(phone.id)}
-                                    onSelect={() => setSelectedPhone(phone)}
-                                    convertToTon={convertToTon}
-                                />
+                                <div key={phone.id} style={styles.phoneCardWithCheckbox}>
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedForOrder.includes(phone.id)}
+                                        onChange={() => toggleSelectForOrder(phone.id)}
+                                        style={styles.checkbox}
+                                    />
+                                    <div style={{...styles.phoneCard, flex: 1, margin: 0}} onClick={() => setSelectedPhone(phone)}>
+                                        <div style={styles.cardContent}>
+                                            <div style={styles.phoneNumber}>{phone.number}</div>
+                                            <button
+                                                style={styles.favoriteBtn}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleFavorite(phone.id);
+                                                }}
+                                            >
+                                                ❤️
+                                            </button>
+                                        </div>
+                                        <div style={styles.priceContainer}>
+                                            <div style={styles.priceUah}>{phone.price.toLocaleString('uk-UA')} грн.</div>
+                                            <div style={styles.priceTon}>💎 {convertToTon(phone.price)} TON</div>
+                                        </div>
+                                    </div>
+                                </div>
                             ))}
-                            {favorites.length === 0 && (
+
+                            {/* Пустое состояние */}
+                            {phones.filter(p => favorites.includes(p.id)).length === 0 && (
                                 <div style={styles.noResults}>
                                     <p>Обраних номерів немає</p>
                                     <p style={styles.noResultsHint}>Додайте номери, які сподобались</p>
+                                </div>
+                            )}
+
+                            {/* Кнопка заказа */}
+                            {phones.filter(p => favorites.includes(p.id)).length > 0 && (
+                                <div style={styles.orderButtonContainer}>
+                                    <button 
+                                        style={styles.orderButton}
+                                        onClick={orderSelected}
+                                        disabled={ordering}
+                                    >
+                                        {ordering ? 'Відправка...' : '💬 Замовити'}
+                                    </button>
                                 </div>
                             )}
                         </div>
@@ -353,7 +644,7 @@
                         <PhoneDetails
                             phone={selectedPhone}
                             onClose={() => setSelectedPhone(null)}
-                            onContact={() => contactSeller(selectedPhone)}
+                            onContact={handleOrder}
                             isFavorite={favorites.includes(selectedPhone.id)}
                             onToggleFavorite={() => toggleFavorite(selectedPhone.id)}
                             convertToTon={convertToTon}
@@ -399,23 +690,7 @@
 
                         <div style={styles.modalBody}>
                             <div style={styles.detailsNumber}>{phone.number}</div>
-                            <div style={styles.detailsOperator}>Оператор: {phone.operator}</div>
-                            
-                            <div style={styles.detailsSection}>
-                                <h3 style={styles.sectionTitle}>Опис</h3>
-                                <p style={styles.sectionText}>{phone.description}</p>
-                            </div>
-
-                            <div style={styles.detailsSection}>
-                                <h3 style={styles.sectionTitle}>Особливості</h3>
-                                <div style={styles.features}>
-                                    {phone.features.map((feature, idx) => (
-                                        <span key={idx} style={styles.featureTag}>
-                                            ✓ {feature}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
+                            <div style={styles.detailsOperator}>Оператор: {getOperatorByCode(phone.number)}</div>
 
                             <div style={styles.detailsPriceBox}>
                                 <div style={styles.detailsPriceRow}>
@@ -436,8 +711,14 @@
                             >
                                 {isFavorite ? '❤️ В обраному' : '🤍 До обраного'}
                             </button>
-                            <button style={styles.contactModalBtn} onClick={onContact}>
-                                📞 Зв'язатися
+                            <button 
+                                style={styles.contactModalBtn} 
+                                onClick={() => {
+                                    onContact([phone]);
+                                    onClose();
+                                }}
+                            >
+                                💬 Замовити
                             </button>
                         </div>
                     </div>
@@ -449,18 +730,18 @@
         const styles = {
             container: {
                 fontFamily: '"Manrope", -apple-system, BlinkMacSystemFont, sans-serif',
-                backgroundColor: tg.themeParams.bg_color || '#f8f9fa',
-                color: tg.themeParams.text_color || '#1a1a1a',
+                backgroundColor: '#17212b',
+                color: '#ffffff',
                 minHeight: '100vh',
                 paddingBottom: '20px'
             },
             stickyHeader: {
                 position: 'sticky',
                 top: 0,
-                backgroundColor: tg.themeParams.bg_color || '#f8f9fa',
+                backgroundColor: '#17212b',
                 zIndex: 100,
                 paddingBottom: '12px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
             },
             header: {
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -521,20 +802,22 @@
                 transition: 'border-color 0.2s',
                 fontWeight: '600'
             },
+            searchInfoRow: {
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: '4px'
+            },
             searchHint: {
-                marginTop: '4px',
                 fontSize: '13px',
                 color: '#ffffff',
                 fontWeight: '500',
-                textAlign: 'left',
                 textShadow: '0 1px 2px rgba(0,0,0,0.2)'
             },
             searchCounter: {
-                marginTop: '2px',
                 fontSize: '12px',
                 color: '#ffffff',
                 fontWeight: '600',
-                textAlign: 'right',
                 textShadow: '0 1px 2px rgba(0,0,0,0.2)'
             },
             filtersRow: {
@@ -544,8 +827,8 @@
                 marginBottom: '8px'
             },
             sortSelect: {
-                flex: '1 1 40%',
-                padding: '12px 10px',
+                width: '100%',
+                padding: '12px 38px 12px 10px',
                 border: '2px solid #e5e7eb',
                 borderRadius: '10px',
                 fontSize: '13px',
@@ -553,12 +836,36 @@
                 backgroundColor: 'white',
                 cursor: 'pointer',
                 outline: 'none',
-                lineHeight: '1.3',
-                whiteSpace: 'normal',
-                height: 'auto'
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                MozAppearance: 'none',
+                color: 'transparent',
+                height: '48px',
+                boxSizing: 'border-box',
+                backgroundImage: 'none'
+            },
+            sortDisplayText: {
+                position: 'absolute',
+                top: '50%',
+                left: '10px',
+                right: '40px',
+                transform: 'translateY(-50%)',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#1a1a1a',
+                pointerEvents: 'none'
+            },
+            sortArrow: {
+                position: 'absolute',
+                top: '50%',
+                right: '10px',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none',
+                display: 'flex',
+                alignItems: 'center'
             },
             priceFilterInput: {
-                flex: '1 1 60%',
+                flex: '1 1 65%',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
@@ -566,7 +873,9 @@
                 padding: '0 12px',
                 border: '2px solid #e5e7eb',
                 borderRadius: '10px',
-                minWidth: 0
+                minWidth: 0,
+                height: '48px',
+                boxSizing: 'border-box'
             },
             priceInput: {
                 flex: 1,
@@ -584,6 +893,40 @@
                 whiteSpace: 'nowrap',
                 flexShrink: 0
             },
+            sameDigitsFilter: {
+                padding: '0 20px',
+                marginBottom: '12px'
+            },
+            sameDigitsLabel: {
+                fontSize: '13px',
+                fontWeight: '600',
+                color: '#ffffff',
+                marginBottom: '8px',
+                textShadow: '0 1px 2px rgba(0,0,0,0.2)'
+            },
+            sameDigitsButtons: {
+                display: 'flex',
+                gap: '8px'
+            },
+            sameDigitsBtn: {
+                flex: 1,
+                padding: '10px',
+                border: '2px solid #e5e7eb',
+                borderRadius: '10px',
+                backgroundColor: 'white',
+                color: '#1a1a1a',
+                fontSize: '14px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.06)'
+            },
+            sameDigitsBtnActive: {
+                backgroundColor: '#667eea',
+                color: 'white',
+                borderColor: '#667eea',
+                boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)'
+            },
             phoneList: {
                 padding: '0 20px 20px 20px',
                 marginTop: '12px'
@@ -593,7 +936,7 @@
                 borderRadius: '12px',
                 padding: '16px',
                 marginBottom: '10px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
                 cursor: 'pointer',
                 transition: 'transform 0.2s, box-shadow 0.2s'
             },
@@ -707,8 +1050,7 @@
                 backgroundColor: 'white',
                 borderRadius: '20px 20px 0 0',
                 width: '100%',
-                maxHeight: '80vh',
-                overflow: 'auto'
+                overflow: 'hidden'
             },
             modalHeader: {
                 display: 'flex',
@@ -731,7 +1073,7 @@
                 color: '#999'
             },
             modalBody: {
-                padding: '20px'
+                padding: '10px 20px'
             },
             detailsNumber: {
                 fontSize: '26px',
@@ -774,7 +1116,7 @@
                 padding: '16px',
                 backgroundColor: '#f8f9fa',
                 borderRadius: '12px',
-                marginTop: '20px'
+                marginTop: '12px'
             },
             detailsPriceRow: {
                 display: 'flex',
@@ -824,6 +1166,61 @@
                 fontSize: '15px',
                 fontWeight: '600',
                 cursor: 'pointer'
+            },
+            orderInstruction: {
+                backgroundColor: '#e0f2fe',
+                padding: '12px 16px',
+                borderRadius: '10px',
+                marginBottom: '16px',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#0369a1',
+                textAlign: 'center'
+            },
+            orderError: {
+                backgroundColor: '#fee2e2',
+                padding: '12px 16px',
+                borderRadius: '10px',
+                marginBottom: '16px',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#991b1b',
+                textAlign: 'center'
+            },
+            phoneCardWithCheckbox: {
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '10px'
+            },
+            checkbox: {
+                width: '20px',
+                height: '20px',
+                cursor: 'pointer',
+                accentColor: '#667eea',
+                flexShrink: 0
+            },
+            orderButtonContainer: {
+                position: 'fixed',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                padding: '16px 20px',
+                backgroundColor: 'white',
+                boxShadow: '0 -4px 12px rgba(0,0,0,0.1)',
+                zIndex: 50
+            },
+            orderButton: {
+                width: '100%',
+                padding: '16px',
+                border: 'none',
+                borderRadius: '12px',
+                backgroundColor: '#667eea',
+                color: 'white',
+                fontSize: '16px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
             }
         };
 
@@ -843,6 +1240,21 @@
             
             input[type="number"] {
                 -moz-appearance: textfield;
+            }
+            
+            /* Стили для увеличения галочки в select */
+            select option:checked {
+                font-weight: 700;
+            }
+            
+            select {
+                appearance: none !important;
+                -webkit-appearance: none !important;
+                -moz-appearance: none !important;
+            }
+            
+            select::-ms-expand {
+                display: none;
             }
         `;
         document.head.appendChild(styleSheet);
