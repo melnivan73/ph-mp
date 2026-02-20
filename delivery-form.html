@@ -275,9 +275,18 @@
     <div id="root"></div>
 
     <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.ready();
+        // Безопасная инициализация - window.Telegram может не загрузиться на мобильном
+        let tg = null;
+        function initTg() {
+            if (window.Telegram && window.Telegram.WebApp) {
+                tg = window.Telegram.WebApp;
+                tg.ready();
+                tg.expand();
+            } else {
+                setTimeout(initTg, 200);
+            }
+        }
+        initTg();
 
         const API_URL = 'https://ph-mp-api.vercel.app';
         
@@ -497,7 +506,7 @@
                         window.location.href = `https://ph-mp.vercel.app/ton-payment.html?orderId=${orderId}`;
                     } else {
                         // Показываем успех для наличных
-                        root.innerHTML = '<div class="container"><div class="success-box"><div class="success-icon">✅</div><h2 class="success-title">Замовлення прийнято!</h2><p class="success-text">Оплата при отриманні.<br>Менеджер зв\'яжеться з вами для підтвердження.</p><button class="close-btn" onclick="window.Telegram.WebApp.close()">Закрити</button></div></div>';
+                        root.innerHTML = '<div class="container"><div class="success-box"><div class="success-icon">✅</div><h2 class="success-title">Замовлення прийнято!</h2><p class="success-text">Оплата при отриманні.<br>Менеджер зв\'яжеться з вами для підтвердження.</p><button class="close-btn" onclick="if(window.Telegram && window.Telegram.WebApp) window.Telegram.WebApp.close();">Закрити</button></div></div>';
                     }
                 } else {
                     throw new Error(result.error || 'Помилка відправки');
