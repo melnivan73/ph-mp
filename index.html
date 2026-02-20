@@ -16,31 +16,10 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // Безопасная инициализация Telegram WebApp
-        let tg = null;
-
-        function initTg() {
-          if (window.Telegram && window.Telegram.WebApp) {
-            tg = window.Telegram.WebApp;
-            tg.ready();   // обязательно! убирает лоадер Telegram
-            tg.expand();  // разворачивает на весь экран
-            console.log('Telegram WebApp ready');
-          } else {
-            console.warn('WebApp not ready yet');
-            setTimeout(initTg, 300); // повтор через 300 мс (можно увеличить до 500–800 если нужно)
-          }
-        }
-
-        // Запускаем как можно раньше
-        window.addEventListener('TelegramWebAppReady', initTg, { once: true });
-        initTg(); // пробуем сразу
-
-        // Запасной вариант — ждём DOM и повторяем
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', initTg);
-        } else {
-          initTg();
-        }
+        // Инициализация Telegram WebApp
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
 
         // Конфигурация API
         const API_URL = 'https://ph-mp-api.vercel.app';
@@ -292,10 +271,6 @@
 
             // Контакт с продавцом
             const contactSeller = (phone) => {
-                if (!tg) {
-                    console.warn('tg not initialized yet');
-                    return;
-                }
                 const message = `Вітаю! Цікавить номер ${phone.number} за ${phone.price.toLocaleString('uk-UA')} грн.`;
                 tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(message)}`);
             };
@@ -308,68 +283,27 @@
 
             // Функция отправки заказа
             const handleOrder = async (phonesToOrder) => {
-                console.log('🚀 handleOrder called with:', phonesToOrder);
-                
-                if (!tg) {
-                    console.error('❌ tg is not initialized');
-                    setOrderError('Telegram не готовий. Спробуйте ще раз через секунду.');
-                    return;
-                }
-                
-                console.log('✅ tg initialized:', tg);
-                console.log('🔍 initDataUnsafe:', JSON.stringify(tg.initDataUnsafe));
-                console.log('🔍 initData:', tg.initData);
-                console.log('🔍 Full tg object keys:', Object.keys(tg));
-                
                 try {
                     setOrdering(true);
                     setOrderError('');
 
-                    // Пробуем получить данные пользователя разными способами
-                    let user = tg.initDataUnsafe?.user;
-                    let userId = user?.id;
-                    let username = user?.username;
-                    
-                    // Fallback для Desktop - парсим initData строку
-                    if (!userId && tg.initData) {
-                        console.log('🔄 Trying to parse initData string...');
-                        try {
-                            const params = new URLSearchParams(tg.initData);
-                            const userStr = params.get('user');
-                            if (userStr) {
-                                const userData = JSON.parse(decodeURIComponent(userStr));
-                                userId = userData.id;
-                                username = userData.username;
-                                console.log('✅ Parsed user from initData:', userData);
-                            }
-                        } catch (e) {
-                            console.error('Failed to parse initData:', e);
-                        }
-                    }
-                    
-                    console.log('👤 Final user data:', { userId, username });
-                    
-                    const orderData = {
-                        phones: phonesToOrder,
-                        username: username || 'невідомий',
-                        userId: userId
-                    };
-                    console.log('📦 Sending order data:', orderData);
+                    const user = tg.initDataUnsafe?.user;
                     
                     const response = await fetch(`${API_URL}/api/order`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify(orderData)
+                        body: JSON.stringify({
+                            phones: phonesToOrder,
+                            username: user?.username || 'невідомий',
+                            userId: user?.id
+                        })
                     });
 
-                    console.log('📥 Response status:', response.status);
                     const data = await response.json();
-                    console.log('📥 Response data:', data);
 
                     if (data.success) {
-                        console.log('✅ Order successful');
                         alert('✅ Замовлення відправлено!\n\nОчікуйте відповіді менеджера.');
                         setSelectedForOrder([]);
                         if (selectedPhone) setSelectedPhone(null);
@@ -378,7 +312,7 @@
                     }
 
                 } catch (error) {
-                    console.error('❌ Помилка замовлення:', error);
+                    console.error('Помилка замовлення:', error);
                     setOrderError('Помилка при відправці замовлення. Спробуйте ще раз.');
                 } finally {
                     setOrdering(false);
@@ -396,18 +330,13 @@
 
             // Заказ выбранных номеров из Обране
             const orderSelected = () => {
-                console.log('🛒 orderSelected called');
-                console.log('📋 selectedForOrder:', selectedForOrder);
-                
                 if (selectedForOrder.length === 0) {
-                    console.warn('⚠️ No phones selected');
                     setOrderError('Оберіть хоча б один номер');
                     setTimeout(() => setOrderError(''), 3000);
                     return;
                 }
 
                 const phonesToOrder = phones.filter(p => selectedForOrder.includes(p.id));
-                console.log('📱 Phones to order:', phonesToOrder);
                 handleOrder(phonesToOrder);
             };
 
