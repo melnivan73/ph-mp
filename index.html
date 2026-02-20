@@ -78,11 +78,7 @@
             const [phones, setPhones] = useState([]);
             const [filteredPhones, setFilteredPhones] = useState([]);
             const [searchQuery, setSearchQuery] = useState('');
-            const [favorites, setFavorites] = useState(() => {
-                // Загружаем избранное из localStorage при инициализации
-                const saved = localStorage.getItem('favorites');
-                return saved ? JSON.parse(saved) : [];
-            });
+            const [favorites, setFavorites] = useState([]);
             const [selectedPhone, setSelectedPhone] = useState(null);
             const [activeTab, setActiveTab] = useState('catalog');
             const [loading, setLoading] = useState(true);
@@ -113,11 +109,6 @@
                 const interval = setInterval(loadTonRate, 60 * 60 * 1000);
                 return () => clearInterval(interval);
             }, []);
-
-            // Сохранение избранного в localStorage
-            useEffect(() => {
-                localStorage.setItem('favorites', JSON.stringify(favorites));
-            }, [favorites]);
 
             async function loadPhones() {
                 try {
@@ -603,18 +594,18 @@
         const styles = {
             container: {
                 fontFamily: '"Manrope", -apple-system, BlinkMacSystemFont, sans-serif',
-                backgroundColor: '#17212b',
-                color: '#ffffff',
+                backgroundColor: tg.themeParams.bg_color || '#f8f9fa',
+                color: tg.themeParams.text_color || '#1a1a1a',
                 minHeight: '100vh',
                 paddingBottom: '20px'
             },
             stickyHeader: {
                 position: 'sticky',
                 top: 0,
-                backgroundColor: '#17212b',
+                backgroundColor: tg.themeParams.bg_color || '#f8f9fa',
                 zIndex: 100,
                 paddingBottom: '12px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
             },
             header: {
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -775,7 +766,7 @@
                 borderRadius: '12px',
                 padding: '16px',
                 marginBottom: '10px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
                 cursor: 'pointer',
                 transition: 'transform 0.2s, box-shadow 0.2s'
             },
