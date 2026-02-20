@@ -108,7 +108,13 @@
             const [selectedForOrder, setSelectedForOrder] = useState([]);
             const [orderError, setOrderError] = useState('');
             const [ordering, setOrdering] = useState(false);
+            const [debugLog, setDebugLog] = useState([]);
             const [successModal, setSuccessModal] = useState(false);
+            
+            const addLog = (msg) => {
+                const time = new Date().toLocaleTimeString('uk-UA');
+                setDebugLog(prev => [...prev.slice(-20), `[${time}] ${msg}`]);
+            };
             const [sameDigitsFilter, setSameDigitsFilter] = useState('all'); // 'all', '5', '6', '7'
             
             // Короткие названия для отображения в select
@@ -303,6 +309,8 @@
 
             // Функция отправки заказа
             const handleOrder = async (phonesToOrder) => {
+                addLog(`handleOrder called, phones: ${phonesToOrder.length}`);
+                addLog(`tg: ${tg ? 'OK' : 'null'}, tgInitialized: ${tgInitialized}`);
                 // Короткое ожидание если tg еще инициализируется (максимум 2 сек)
                 if (!tg) {
                     let attempts = 0;
@@ -312,7 +320,85 @@
                     }
                 }
                 
-                // НЕ блокируем заказ если tg недоступен — просто отправим без userId
+                if (!tg) {
+                    addLog('❌ tg not ready, proceeding anyway');
+                }
+                
+                try {
+                    setOrdering(true);
+                    setOrderError('');
+                    addLog('Fetching order...');
+
+                    let user = tg?.initDataUnsafe?.user;
+                    let userId = user?.id;
+                    let username = user?.username;
+                    addLog(`userId: ${userId}, username: ${username}`);
+                    
+                    // Fallback - парсим initData
+                    if (!userId && tg?.initData) {
+                        try {
+                            const params = new URLSearchParams(tg.initData);
+                            const userStr = params.get('user');
+                            if (userStr) {
+                                const userData = JSON.parse(decodeURIComponent(userStr));
+                                userId = userData.id;
+                                username = userData.username;
+                                addLog(`Parsed userId: ${userId}`);
+                            }
+                        } catch (e) {
+                            addLog(`initData parse error: ${e.message}`);
+                        }
+                    }
+                    
+                    const orderData = {
+                        phones: phonesToOrder,
+                        username: username || 'невідомий',
+                        userId: userId
+                    };
+                    
+                    addLog(`POST to ${API_URL}/api/order`);
+                    const response = await fetch(`${API_URL}/api/order`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(orderData)
+                    });
+                    addLog(`Response status: ${response.status}`);
+
+                    const data = await response.json();
+                    addLog(`data.success: ${data.success}, error: ${data.error}`);
+
+                    if (data.success) {
+                        setSuccessModal(true);
+                        setSelectedForOrder([]);
+                        if (selectedPhone) setSelectedPhone(null);
+                    } else {
+                        throw new Error(data.error || 'Помилка відправки');
+                    }
+
+                } catch (error) {
+                    addLog(`❌ CATCH: ${error.message}`);
+                    console.error('❌ Помилка замовлення:', error);
+                    setOrderError(error.message || 'Помилка при відправці замовлення. Спробуйте ще раз.');
+                } finally {
+                    setOrdering(false);
+                }
+            };
+                // Короткое ожидание если tg еще инициализируется (максимум 2 сек)
+                if (!tg) {
+                    let attempts = 0;
+                    while (!tgInitialized && attempts < 20) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        attempts++;
+                    }
+                }
+                
+                if (!tg) {
+                    alert('Telegram ще не готовий.\nПочекайте секунду та спробуйте ще раз.');
+                    setOrderError('Telegram не готовий.');
+                    return;
+                }
                 
                 try {
                     setOrdering(true);
@@ -354,7 +440,7 @@
                     const data = await response.json();
 
                     if (data.success) {
-                        setSuccessModal(true);
+                        alert('✅ Замовлення відправлено!\n\nОчікуйте відповіді менеджера.');
                         setSelectedForOrder([]);
                         if (selectedPhone) setSelectedPhone(null);
                     } else {
@@ -380,7 +466,7 @@
 
             // Заказ выбранных номеров из Обране
             const orderSelected = () => {
-                console.log('🛒 orderSelected called');
+                addLog(`orderSelected called, selectedForOrder: ${selectedForOrder.length}`);
                 console.log('📋 selectedForOrder:', selectedForOrder);
                 
                 if (selectedForOrder.length === 0) {
@@ -420,13 +506,18 @@
                                 <div style={{fontSize:'48px',marginBottom:'12px'}}>✅</div>
                                 <h3 style={{margin:'0 0 8px',fontSize:'18px',fontWeight:'700',color:'#111'}}>Замовлення відправлено!</h3>
                                 <p style={{margin:'0 0 20px',color:'#666',fontSize:'15px'}}>Очікуйте відповіді менеджера.</p>
-                                <button
-                                    onClick={() => setSuccessModal(false)}
-                                    style={{background:'#667eea',color:'#fff',border:'none',borderRadius:'10px',padding:'12px 32px',fontSize:'16px',fontWeight:'600',cursor:'pointer',width:'100%'}}
-                                >
-                                    OK
-                                </button>
+                                <button onClick={() => setSuccessModal(false)} style={{background:'#667eea',color:'#fff',border:'none',borderRadius:'10px',padding:'12px 32px',fontSize:'16px',fontWeight:'600',cursor:'pointer',width:'100%'}}>OK</button>
                             </div>
+                        </div>
+                    )}
+                    {/* DEBUG LOG */}
+                    {debugLog.length > 0 && (
+                        <div style={{position:'fixed',bottom:0,left:0,right:0,background:'rgba(0,0,0,0.85)',color:'#0f0',fontFamily:'monospace',fontSize:'11px',padding:'8px',zIndex:8888,maxHeight:'200px',overflowY:'auto'}}>
+                            <div style={{display:'flex',justifyContent:'space-between',marginBottom:'4px'}}>
+                                <b>DEBUG LOG</b>
+                                <span onClick={() => setDebugLog([])} style={{cursor:'pointer',color:'#f00'}}>✕ CLEAR</span>
+                            </div>
+                            {debugLog.map((line, i) => <div key={i}>{line}</div>)}
                         </div>
                     )}
                     {/* Фиксированная шапка */}
