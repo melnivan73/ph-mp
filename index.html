@@ -308,31 +308,44 @@
 
             // Функция отправки заказа
             const handleOrder = async (phonesToOrder) => {
+                console.log('🚀 handleOrder called with:', phonesToOrder);
+                
                 if (!tg) {
+                    console.error('❌ tg is not initialized');
                     setOrderError('Telegram не готовий. Спробуйте ще раз через секунду.');
                     return;
                 }
+                
+                console.log('✅ tg initialized:', tg);
+                
                 try {
                     setOrdering(true);
                     setOrderError('');
 
                     const user = tg.initDataUnsafe?.user;
+                    console.log('👤 User data:', user);
+                    
+                    const orderData = {
+                        phones: phonesToOrder,
+                        username: user?.username || 'невідомий',
+                        userId: user?.id
+                    };
+                    console.log('📦 Sending order data:', orderData);
                     
                     const response = await fetch(`${API_URL}/api/order`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({
-                            phones: phonesToOrder,
-                            username: user?.username || 'невідомий',
-                            userId: user?.id
-                        })
+                        body: JSON.stringify(orderData)
                     });
 
+                    console.log('📥 Response status:', response.status);
                     const data = await response.json();
+                    console.log('📥 Response data:', data);
 
                     if (data.success) {
+                        console.log('✅ Order successful');
                         alert('✅ Замовлення відправлено!\n\nОчікуйте відповіді менеджера.');
                         setSelectedForOrder([]);
                         if (selectedPhone) setSelectedPhone(null);
@@ -341,7 +354,7 @@
                     }
 
                 } catch (error) {
-                    console.error('Помилка замовлення:', error);
+                    console.error('❌ Помилка замовлення:', error);
                     setOrderError('Помилка при відправці замовлення. Спробуйте ще раз.');
                 } finally {
                     setOrdering(false);
@@ -359,13 +372,18 @@
 
             // Заказ выбранных номеров из Обране
             const orderSelected = () => {
+                console.log('🛒 orderSelected called');
+                console.log('📋 selectedForOrder:', selectedForOrder);
+                
                 if (selectedForOrder.length === 0) {
+                    console.warn('⚠️ No phones selected');
                     setOrderError('Оберіть хоча б один номер');
                     setTimeout(() => setOrderError(''), 3000);
                     return;
                 }
 
                 const phonesToOrder = phones.filter(p => selectedForOrder.includes(p.id));
+                console.log('📱 Phones to order:', phonesToOrder);
                 handleOrder(phonesToOrder);
             };
 
