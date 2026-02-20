@@ -16,31 +16,10 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // Безопасная инициализация Telegram WebApp
-        let tg = null;
-
-        function initTg() {
-          if (window.Telegram && window.Telegram.WebApp) {
-            tg = window.Telegram.WebApp;
-            tg.ready();   // обязательно! убирает лоадер Telegram
-            tg.expand();  // разворачивает на весь экран
-            console.log('Telegram WebApp ready');
-          } else {
-            console.warn('WebApp not ready yet');
-            setTimeout(initTg, 300); // повтор через 300 мс (можно увеличить до 500–800 если нужно)
-          }
-        }
-
-        // Запускаем как можно раньше
-        window.addEventListener('TelegramWebAppReady', initTg, { once: true });
-        initTg(); // пробуем сразу
-
-        // Запасной вариант — ждём DOM и повторяем
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', initTg);
-        } else {
-          initTg();
-        }
+        // Инициализация Telegram WebApp
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
 
         // Конфигурация API
         const API_URL = 'https://ph-mp-api.vercel.app';
@@ -268,10 +247,6 @@
 
             // Контакт с продавцом
             const contactSeller = (phone) => {
-                if (!tg) {
-                    console.warn('tg not initialized yet');
-                    return;
-                }
                 const message = `Вітаю! Цікавить номер ${phone.number} за ${phone.price.toLocaleString('uk-UA')} грн.`;
                 tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(message)}`);
             };
@@ -284,10 +259,6 @@
 
             // Функция отправки заказа
             const handleOrder = async (phonesToOrder) => {
-                if (!tg) {
-                    setOrderError('Telegram не готовий. Спробуйте ще раз через секунду.');
-                    return;
-                }
                 try {
                     setOrdering(true);
                     setOrderError('');
