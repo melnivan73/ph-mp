@@ -93,7 +93,6 @@
             const [selectedForOrder, setSelectedForOrder] = useState([]);
             const [orderError, setOrderError] = useState('');
             const [ordering, setOrdering] = useState(false);
-            const [sameDigitsFilter, setSameDigitsFilter] = useState('all');
             
             // Короткие названия для отображения в select
             const sortLabels = {
@@ -168,16 +167,6 @@
                 return digits.slice(-7);
             };
 
-            // Подсчёт максимального количества одинаковых цифр
-            const countMaxSameDigits = (number) => {
-                const lastSeven = getLastSevenDigits(number);
-                const digitCounts = {};
-                for (let digit of lastSeven) {
-                    digitCounts[digit] = (digitCounts[digit] || 0) + 1;
-                }
-                return Math.max(...Object.values(digitCounts));
-            };
-
             // Поиск с поддержкой маски * (любая цифра) - ИСПРАВЛЕННАЯ ВЕРСИЯ
             const matchesWildcard = (pattern, text) => {
                 // Удаляем все нецифровые символы кроме *
@@ -224,15 +213,6 @@
                     });
                 }
 
-                // Фильтр по количеству одинаковых цифр
-                if (sameDigitsFilter !== 'all') {
-                    const targetCount = parseInt(sameDigitsFilter);
-                    filtered = filtered.filter(p => {
-                        const maxCount = countMaxSameDigits(p.number);
-                        return maxCount === targetCount;
-                    });
-                }
-
                 // Фильтр по максимальной цене
                 if (debouncedMaxPrice) {
                     const maxPriceValue = parseInt(debouncedMaxPrice);
@@ -249,7 +229,7 @@
                 }
 
                 setFilteredPhones(filtered);
-            }, [phones, debouncedSearch, sortBy, debouncedMaxPrice, sameDigitsFilter]);
+            }, [phones, debouncedSearch, sortBy, debouncedMaxPrice]);
 
             // Счётчик найденных номеров
             const searchCounter = useMemo(() => {
@@ -430,25 +410,6 @@
                                             style={styles.priceInput}
                                         />
                                         <span style={styles.priceLabel}>грн.</span>
-                                    </div>
-                                </div>
-
-                                {/* Фильтр по одинаковым цифрам */}
-                                <div style={styles.sameDigitsFilter}>
-                                    <div style={styles.sameDigitsLabel}>однакових в номері</div>
-                                    <div style={styles.sameDigitsButtons}>
-                                        <button style={{...styles.sameDigitsBtn, ...(sameDigitsFilter === 'all' ? styles.sameDigitsBtnActive : {})}} onClick={() => setSameDigitsFilter('all')}>
-                                            всі
-                                        </button>
-                                        <button style={{...styles.sameDigitsBtn, ...(sameDigitsFilter === '5' ? styles.sameDigitsBtnActive : {})}} onClick={() => setSameDigitsFilter('5')}>
-                                            5
-                                        </button>
-                                        <button style={{...styles.sameDigitsBtn, ...(sameDigitsFilter === '6' ? styles.sameDigitsBtnActive : {})}} onClick={() => setSameDigitsFilter('6')}>
-                                            6
-                                        </button>
-                                        <button style={{...styles.sameDigitsBtn, ...(sameDigitsFilter === '7' ? styles.sameDigitsBtnActive : {})}} onClick={() => setSameDigitsFilter('7')}>
-                                            7
-                                        </button>
                                     </div>
                                 </div>
                             </>
@@ -804,40 +765,6 @@
                 color: '#6b7280',
                 whiteSpace: 'nowrap',
                 flexShrink: 0
-            },
-            sameDigitsFilter: {
-                padding: '0 20px',
-                marginBottom: '12px'
-            },
-            sameDigitsLabel: {
-                fontSize: '13px',
-                fontWeight: '600',
-                color: '#ffffff',
-                marginBottom: '8px',
-                textShadow: '0 1px 2px rgba(0,0,0,0.2)'
-            },
-            sameDigitsButtons: {
-                display: 'flex',
-                gap: '8px'
-            },
-            sameDigitsBtn: {
-                flex: 1,
-                padding: '10px',
-                border: '2px solid #e5e7eb',
-                borderRadius: '10px',
-                backgroundColor: 'white',
-                color: '#1a1a1a',
-                fontSize: '14px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.06)'
-            },
-            sameDigitsBtnActive: {
-                backgroundColor: '#667eea',
-                color: 'white',
-                borderColor: '#667eea',
-                boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)'
             },
             phoneList: {
                 padding: '0 20px 20px 20px',
