@@ -317,18 +317,41 @@
                 }
                 
                 console.log('✅ tg initialized:', tg);
+                console.log('🔍 initDataUnsafe:', tg.initDataUnsafe);
+                console.log('🔍 initData:', tg.initData);
                 
                 try {
                     setOrdering(true);
                     setOrderError('');
 
-                    const user = tg.initDataUnsafe?.user;
-                    console.log('👤 User data:', user);
+                    // Пробуем получить данные пользователя разными способами
+                    let user = tg.initDataUnsafe?.user;
+                    let userId = user?.id;
+                    let username = user?.username;
+                    
+                    // Fallback для Desktop - парсим initData строку
+                    if (!userId && tg.initData) {
+                        console.log('🔄 Trying to parse initData string...');
+                        try {
+                            const params = new URLSearchParams(tg.initData);
+                            const userStr = params.get('user');
+                            if (userStr) {
+                                const userData = JSON.parse(decodeURIComponent(userStr));
+                                userId = userData.id;
+                                username = userData.username;
+                                console.log('✅ Parsed user from initData:', userData);
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse initData:', e);
+                        }
+                    }
+                    
+                    console.log('👤 Final user data:', { userId, username });
                     
                     const orderData = {
                         phones: phonesToOrder,
-                        username: user?.username || 'невідомий',
-                        userId: user?.id
+                        username: username || 'невідомий',
+                        userId: userId
                     };
                     console.log('📦 Sending order data:', orderData);
                     
