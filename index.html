@@ -16,9 +16,31 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // Безопасная инициализация Telegram WebApp
+        // Инициализация Telegram WebApp
         let tg = null;
         let tgInitialized = false;
+        let tgUserFromUrl = null;
+
+        // Парсим данные пользователя прямо из URL хэша (работает даже если скрипт не загрузился)
+        function parseTgUserFromUrl() {
+          try {
+            const hash = window.location.hash.substring(1);
+            const params = new URLSearchParams(hash);
+            const tgWebAppData = params.get('tgWebAppData');
+            if (tgWebAppData) {
+              const decoded = decodeURIComponent(tgWebAppData);
+              const dataParams = new URLSearchParams(decoded);
+              const userStr = dataParams.get('user');
+              if (userStr) {
+                tgUserFromUrl = JSON.parse(decodeURIComponent(userStr));
+                console.log('✅ User from URL:', tgUserFromUrl);
+              }
+            }
+          } catch(e) {
+            console.warn('URL parse error:', e);
+          }
+        }
+        parseTgUserFromUrl();
 
         function initTg() {
           if (window.Telegram && window.Telegram.WebApp) {
@@ -101,13 +123,6 @@
             const [selectedPhone, setSelectedPhone] = useState(null);
             const [activeTab, setActiveTab] = useState('catalog');
             const [loading, setLoading] = useState(true);
-            const [envInfo] = useState(() => ({
-                tgExists: !!(window.Telegram),
-                tgWebAppExists: !!(window.Telegram && window.Telegram.WebApp),
-                userAgent: navigator.userAgent,
-                platform: navigator.platform,
-                url: window.location.href,
-            }));
             const [error, setError] = useState(null);
             const [sortBy, setSortBy] = useState('cheap');
             const [maxPriceInput, setMaxPriceInput] = useState('');
@@ -115,6 +130,7 @@
             const [selectedForOrder, setSelectedForOrder] = useState([]);
             const [orderError, setOrderError] = useState('');
             const [ordering, setOrdering] = useState(false);
+            const [successModal, setSuccessModal] = useState(false);
             const [sameDigitsFilter, setSameDigitsFilter] = useState('all'); // 'all', '5', '6', '7'
             
             // Короткие названия для отображения в select
@@ -317,23 +333,24 @@
                         attempts++;
                     }
                 }
-                
-                if (!tg) {
-                    alert('Telegram ще не готовий.\nПочекайте секунду та спробуйте ще раз.');
-                    setOrderError('Telegram не готовий.');
-                    return;
-                }
+                // Не блокируем — есть fallback через URL
                 
                 try {
                     setOrdering(true);
                     setOrderError('');
 
-                    let user = tg.initDataUnsafe?.user;
-                    let userId = user?.id;
-                    let username = user?.username;
-                    
-                    // Fallback - парсим initData
-                    if (!userId && tg.initData) {
+                    // Получаем данные пользователя (3 источника)
+                    let userId = null;
+                    let username = null;
+
+                    // 1. Из window.Telegram.WebApp (ПК)
+                    if (tg && tg.initDataUnsafe?.user) {
+                        userId = tg.initDataUnsafe.user.id;
+                        username = tg.initDataUnsafe.user.username;
+                    }
+
+                    // 2. Из initData строки
+                    if (!userId && tg && tg.initData) {
                         try {
                             const params = new URLSearchParams(tg.initData);
                             const userStr = params.get('user');
@@ -345,6 +362,12 @@
                         } catch (e) {
                             console.error('Failed to parse initData:', e);
                         }
+                    }
+
+                    // 3. Из URL хэша (мобильный Android/iOS)
+                    if (!userId && tgUserFromUrl) {
+                        userId = tgUserFromUrl.id;
+                        username = tgUserFromUrl.username;
                     }
                     
                     const orderData = {
@@ -364,7 +387,7 @@
                     const data = await response.json();
 
                     if (data.success) {
-                        alert('✅ Замовлення відправлено!\n\nОчікуйте відповіді менеджера.');
+                        setSuccessModal(true);
                         setSelectedForOrder([]);
                         if (selectedPhone) setSelectedPhone(null);
                     } else {
@@ -423,15 +446,17 @@
 
             return (
                 <div style={styles.container}>
-                    {/* ДИАГНОСТИКА - удалить после исправления */}
-                    <div style={{background:'#1a1a2e',color:'#00ff88',fontFamily:'monospace',fontSize:'11px',padding:'10px',lineHeight:'1.6',wordBreak:'break-all'}}>
-                        <b style={{color:'#fff'}}>🔍 ДІАГНОСТИКА</b><br/>
-                        window.Telegram: <b>{String(envInfo.tgExists)}</b><br/>
-                        window.Telegram.WebApp: <b>{String(envInfo.tgWebAppExists)}</b><br/>
-                        tg після init: <b>{tg ? 'OK' : 'null'}</b><br/>
-                        URL: <b>{envInfo.url.substring(0, 60)}</b><br/>
-                        UA: <b>{envInfo.userAgent.substring(0, 80)}</b>
-                    </div>
+                    {/* Модал успішного замовлення */}
+                    {successModal && (
+                        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
+                            <div style={{background:'#fff',borderRadius:'16px',padding:'28px 24px',maxWidth:'320px',width:'100%',textAlign:'center',boxShadow:'0 8px 32px rgba(0,0,0,0.2)'}}>
+                                <div style={{fontSize:'48px',marginBottom:'12px'}}>✅</div>
+                                <h3 style={{margin:'0 0 8px',fontSize:'18px',fontWeight:'700',color:'#111'}}>Замовлення відправлено!</h3>
+                                <p style={{margin:'0 0 20px',color:'#666',fontSize:'15px'}}>Очікуйте відповіді менеджера.</p>
+                                <button onClick={() => setSuccessModal(false)} style={{background:'#667eea',color:'#fff',border:'none',borderRadius:'10px',padding:'12px 32px',fontSize:'16px',fontWeight:'600',cursor:'pointer',width:'100%'}}>OK</button>
+                            </div>
+                        </div>
+                    )}
                     {/* Фиксированная шапка */}
                     <div style={styles.stickyHeader}>
                         {/* Компактная шапка */}
