@@ -16,10 +16,31 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // Инициализация Telegram WebApp
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.ready();
+        // Безопасная инициализация Telegram WebApp
+        let tg = null;
+
+        function initTg() {
+          if (window.Telegram && window.Telegram.WebApp) {
+            tg = window.Telegram.WebApp;
+            tg.ready();   // обязательно! убирает лоадер Telegram
+            tg.expand();  // разворачивает на весь экран
+            console.log('Telegram WebApp ready');
+          } else {
+            console.warn('WebApp not ready yet');
+            setTimeout(initTg, 300); // повтор через 300 мс (можно увеличить до 500–800 если нужно)
+          }
+        }
+
+        // Запускаем как можно раньше
+        window.addEventListener('TelegramWebAppReady', initTg, { once: true });
+        initTg(); // пробуем сразу
+
+        // Запасной вариант — ждём DOM и повторяем
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initTg);
+        } else {
+          initTg();
+        }
 
         // Конфигурация API
         const API_URL = 'https://ph-mp-api.vercel.app';
@@ -94,6 +115,23 @@
             const [orderError, setOrderError] = useState('');
             const [ordering, setOrdering] = useState(false);
             const [sameDigitsFilter, setSameDigitsFilter] = useState('all'); // 'all', '5', '6', '7'
+            const [telegramApp, setTelegramApp] = useState(null); // Добавлено: tg в state
+            
+            // Инициализация Telegram WebApp в useEffect
+            useEffect(() => {
+                // Ждем пока tg инициализируется
+                const checkTg = setInterval(() => {
+                    if (tg) {
+                        setTelegramApp(tg);
+                        clearInterval(checkTg);
+                    }
+                }, 100);
+                
+                // Очистка через 5 секунд если не инициализировался
+                setTimeout(() => clearInterval(checkTg), 5000);
+                
+                return () => clearInterval(checkTg);
+            }, []);
             
             // Короткие названия для отображения в select
             const sortLabels = {
@@ -271,8 +309,12 @@
 
             // Контакт с продавцом
             const contactSeller = (phone) => {
+                if (!telegramApp) {
+                    console.warn('telegramApp not initialized yet');
+                    return;
+                }
                 const message = `Вітаю! Цікавить номер ${phone.number} за ${phone.price.toLocaleString('uk-UA')} грн.`;
-                tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(message)}`);
+                telegramApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(message)}`);
             };
 
             // Конвертация в TON с математическим округлением - ИСПРАВЛЕННАЯ ВЕРСИЯ
@@ -283,27 +325,68 @@
 
             // Функция отправки заказа
             const handleOrder = async (phonesToOrder) => {
+                console.log('🚀 handleOrder called with:', phonesToOrder);
+                
+                if (!telegramApp) {
+                    console.error('❌ telegramApp is not initialized');
+                    setOrderError('Telegram не готовий. Спробуйте ще раз через секунду.');
+                    return;
+                }
+                
+                console.log('✅ telegramApp initialized:', telegramApp);
+                console.log('🔍 initDataUnsafe:', JSON.stringify(telegramApp.initDataUnsafe));
+                console.log('🔍 initData:', telegramApp.initData);
+                console.log('🔍 Full tg object keys:', Object.keys(telegramApp));
+                
                 try {
                     setOrdering(true);
                     setOrderError('');
 
-                    const user = tg.initDataUnsafe?.user;
+                    // Пробуем получить данные пользователя разными способами
+                    let user = telegramApp.initDataUnsafe?.user;
+                    let userId = user?.id;
+                    let username = user?.username;
+                    
+                    // Fallback для Desktop - парсим initData строку
+                    if (!userId && telegramApp.initData) {
+                        console.log('🔄 Trying to parse initData string...');
+                        try {
+                            const params = new URLSearchParams(telegramApp.initData);
+                            const userStr = params.get('user');
+                            if (userStr) {
+                                const userData = JSON.parse(decodeURIComponent(userStr));
+                                userId = userData.id;
+                                username = userData.username;
+                                console.log('✅ Parsed user from initData:', userData);
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse initData:', e);
+                        }
+                    }
+                    
+                    console.log('👤 Final user data:', { userId, username });
+                    
+                    const orderData = {
+                        phones: phonesToOrder,
+                        username: username || 'невідомий',
+                        userId: userId
+                    };
+                    console.log('📦 Sending order data:', orderData);
                     
                     const response = await fetch(`${API_URL}/api/order`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({
-                            phones: phonesToOrder,
-                            username: user?.username || 'невідомий',
-                            userId: user?.id
-                        })
+                        body: JSON.stringify(orderData)
                     });
 
+                    console.log('📥 Response status:', response.status);
                     const data = await response.json();
+                    console.log('📥 Response data:', data);
 
                     if (data.success) {
+                        console.log('✅ Order successful');
                         alert('✅ Замовлення відправлено!\n\nОчікуйте відповіді менеджера.');
                         setSelectedForOrder([]);
                         if (selectedPhone) setSelectedPhone(null);
@@ -312,7 +395,7 @@
                     }
 
                 } catch (error) {
-                    console.error('Помилка замовлення:', error);
+                    console.error('❌ Помилка замовлення:', error);
                     setOrderError('Помилка при відправці замовлення. Спробуйте ще раз.');
                 } finally {
                     setOrdering(false);
@@ -330,13 +413,18 @@
 
             // Заказ выбранных номеров из Обране
             const orderSelected = () => {
+                console.log('🛒 orderSelected called');
+                console.log('📋 selectedForOrder:', selectedForOrder);
+                
                 if (selectedForOrder.length === 0) {
+                    console.warn('⚠️ No phones selected');
                     setOrderError('Оберіть хоча б один номер');
                     setTimeout(() => setOrderError(''), 3000);
                     return;
                 }
 
                 const phonesToOrder = phones.filter(p => selectedForOrder.includes(p.id));
+                console.log('📱 Phones to order:', phonesToOrder);
                 handleOrder(phonesToOrder);
             };
 
