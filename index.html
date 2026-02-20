@@ -18,28 +18,30 @@
 
         // Безопасная инициализация Telegram WebApp
         let tg = null;
+        let tgReady = false;
 
         function initTg() {
           if (window.Telegram && window.Telegram.WebApp) {
             tg = window.Telegram.WebApp;
             tg.ready();   // обязательно! убирает лоадер Telegram
             tg.expand();  // разворачивает на весь экран
-            console.log('Telegram WebApp ready');
+            tgReady = true; // флаг готовности
+            console.log('✅ Telegram WebApp ready, tg =', tg);
           } else {
-            console.warn('WebApp not ready yet');
-            setTimeout(initTg, 300); // повтор через 300 мс (можно увеличить до 500–800 если нужно)
+            console.warn('⚠️ WebApp not ready yet, retrying...');
+            setTimeout(initTg, 500); // увеличиваем задержку до 500мс
           }
         }
 
         // Запускаем как можно раньше
         window.addEventListener('TelegramWebAppReady', initTg, { once: true });
-        initTg(); // пробуем сразу
-
-        // Запасной вариант — ждём DOM и повторяем
+        
+        // Ждем загрузки скрипта
         if (document.readyState === 'loading') {
           document.addEventListener('DOMContentLoaded', initTg);
         } else {
-          initTg();
+          // Даем 100мс на загрузку скрипта telegram-web-app.js
+          setTimeout(initTg, 100);
         }
 
         // Конфигурация API
@@ -115,23 +117,6 @@
             const [orderError, setOrderError] = useState('');
             const [ordering, setOrdering] = useState(false);
             const [sameDigitsFilter, setSameDigitsFilter] = useState('all'); // 'all', '5', '6', '7'
-            const [telegramApp, setTelegramApp] = useState(null); // Добавлено: tg в state
-            
-            // Инициализация Telegram WebApp в useEffect
-            useEffect(() => {
-                // Ждем пока tg инициализируется
-                const checkTg = setInterval(() => {
-                    if (tg) {
-                        setTelegramApp(tg);
-                        clearInterval(checkTg);
-                    }
-                }, 100);
-                
-                // Очистка через 5 секунд если не инициализировался
-                setTimeout(() => clearInterval(checkTg), 5000);
-                
-                return () => clearInterval(checkTg);
-            }, []);
             
             // Короткие названия для отображения в select
             const sortLabels = {
@@ -308,13 +293,14 @@
             };
 
             // Контакт с продавцом
+            // Контакт с продавцом
             const contactSeller = (phone) => {
-                if (!telegramApp) {
-                    console.warn('telegramApp not initialized yet');
+                if (!tg) {
+                    console.warn('tg not initialized yet');
                     return;
                 }
                 const message = `Вітаю! Цікавить номер ${phone.number} за ${phone.price.toLocaleString('uk-UA')} грн.`;
-                telegramApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(message)}`);
+                tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(message)}`);
             };
 
             // Конвертация в TON с математическим округлением - ИСПРАВЛЕННАЯ ВЕРСИЯ
@@ -325,30 +311,33 @@
 
             // Функция отправки заказа
             const handleOrder = async (phonesToOrder) => {
-                console.log('🚀 handleOrder called with:', phonesToOrder);
+                console.log('🚀 handleOrder called');
+                console.log('tg =', tg);
+                console.log('tgReady =', tgReady);
+                console.log('window.Telegram =', window.Telegram);
                 
-                if (!telegramApp) {
-                    console.error('❌ telegramApp is not initialized');
-                    alert('DEBUG: telegramApp is NULL');
-                    setOrderError('Telegram не готовий. Спробуйте ще раз через секунду.');
+                if (!tg) {
+                    console.error('❌ tg is NULL');
+                    alert('DEBUG: tg is NULL\n\ntgReady: ' + tgReady + '\nwindow.Telegram: ' + !!window.Telegram + '\n\nПерезавантажте додаток');
+                    setOrderError('Telegram не готовий. Перезавантажте додаток.');
                     return;
                 }
                 
-                console.log('✅ telegramApp initialized:', telegramApp);
+                console.log('✅ tg initialized:', tg);
                 
                 try {
                     setOrdering(true);
                     setOrderError('');
 
                     // Пробуем получить данные пользователя разными способами
-                    let user = telegramApp.initDataUnsafe?.user;
+                    let user = tg.initDataUnsafe?.user;
                     let userId = user?.id;
                     let username = user?.username;
                     
                     // Fallback для Desktop - парсим initData строку
-                    if (!userId && telegramApp.initData) {
+                    if (!userId && tg.initData) {
                         try {
-                            const params = new URLSearchParams(telegramApp.initData);
+                            const params = new URLSearchParams(tg.initData);
                             const userStr = params.get('user');
                             if (userStr) {
                                 const userData = JSON.parse(decodeURIComponent(userStr));
@@ -361,7 +350,7 @@
                     }
                     
                     if (!userId) {
-                        alert('DEBUG: No userId found!\ninitDataUnsafe: ' + JSON.stringify(telegramApp.initDataUnsafe) + '\ninitData: ' + telegramApp.initData);
+                        alert('DEBUG: No userId found!\ninitDataUnsafe: ' + JSON.stringify(tg.initDataUnsafe) + '\ninitData: ' + tg.initData);
                     }
                     
                     const orderData = {
