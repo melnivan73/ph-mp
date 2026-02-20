@@ -18,15 +18,17 @@
 
         // Безопасная инициализация Telegram WebApp
         let tg = null;
+        let tgInitialized = false;
 
         function initTg() {
           if (window.Telegram && window.Telegram.WebApp) {
             tg = window.Telegram.WebApp;
             tg.ready();
             tg.expand();
+            tgInitialized = true;
             console.log('✅ Telegram WebApp initialized');
           } else {
-            console.warn('⚠️ Telegram not ready, retrying...');
+            console.warn('⏳ Waiting for Telegram WebApp...');
             setTimeout(initTg, 200);
           }
         }
@@ -106,6 +108,7 @@
             const [selectedForOrder, setSelectedForOrder] = useState([]);
             const [orderError, setOrderError] = useState('');
             const [ordering, setOrdering] = useState(false);
+            const [successModal, setSuccessModal] = useState(false);
             const [sameDigitsFilter, setSameDigitsFilter] = useState('all'); // 'all', '5', '6', '7'
             
             // Короткие названия для отображения в select
@@ -300,24 +303,16 @@
 
             // Функция отправки заказа
             const handleOrder = async (phonesToOrder) => {
-                console.log('🚀 handleOrder called');
-                
-                // Ждем пока tg инициализируется (максимум 10 секунд)
-                let attempts = 0;
-                while (!tg && attempts < 100) {
-                    console.log('⏳ Waiting for tg... attempt', attempts);
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    attempts++;
-                }
-                
+                // Короткое ожидание если tg еще инициализируется (максимум 2 сек)
                 if (!tg) {
-                    console.error('❌ tg failed to initialize after 10 seconds');
-                    alert('Помилка ініціалізації Telegram.\nПерезавантажте додаток.');
-                    setOrderError('Telegram не готовий. Перезавантажте додаток.');
-                    return;
+                    let attempts = 0;
+                    while (!tgInitialized && attempts < 20) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        attempts++;
+                    }
                 }
                 
-                console.log('✅ tg ready');
+                // НЕ блокируем заказ если tg недоступен — просто отправим без userId
                 
                 try {
                     setOrdering(true);
@@ -359,7 +354,7 @@
                     const data = await response.json();
 
                     if (data.success) {
-                        alert('✅ Замовлення відправлено!\n\nОчікуйте відповіді менеджера.');
+                        setSuccessModal(true);
                         setSelectedForOrder([]);
                         if (selectedPhone) setSelectedPhone(null);
                     } else {
@@ -418,6 +413,22 @@
 
             return (
                 <div style={styles.container}>
+                    {/* Модал успішного замовлення */}
+                    {successModal && (
+                        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
+                            <div style={{background:'#fff',borderRadius:'16px',padding:'28px 24px',maxWidth:'320px',width:'100%',textAlign:'center',boxShadow:'0 8px 32px rgba(0,0,0,0.2)'}}>
+                                <div style={{fontSize:'48px',marginBottom:'12px'}}>✅</div>
+                                <h3 style={{margin:'0 0 8px',fontSize:'18px',fontWeight:'700',color:'#111'}}>Замовлення відправлено!</h3>
+                                <p style={{margin:'0 0 20px',color:'#666',fontSize:'15px'}}>Очікуйте відповіді менеджера.</p>
+                                <button
+                                    onClick={() => setSuccessModal(false)}
+                                    style={{background:'#667eea',color:'#fff',border:'none',borderRadius:'10px',padding:'12px 32px',fontSize:'16px',fontWeight:'600',cursor:'pointer',width:'100%'}}
+                                >
+                                    OK
+                                </button>
+                            </div>
+                        </div>
+                    )}
                     {/* Фиксированная шапка */}
                     <div style={styles.stickyHeader}>
                         {/* Компактная шапка */}
