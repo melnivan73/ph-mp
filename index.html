@@ -18,31 +18,38 @@
 
         // Безопасная инициализация Telegram WebApp
         let tg = null;
-        let tgReady = false;
 
         function initTg() {
           if (window.Telegram && window.Telegram.WebApp) {
             tg = window.Telegram.WebApp;
-            tg.ready();   // обязательно! убирает лоадер Telegram
-            tg.expand();  // разворачивает на весь экран
-            tgReady = true; // флаг готовности
-            console.log('✅ Telegram WebApp ready, tg =', tg);
+            tg.ready();
+            tg.expand();
+            console.log('✅ Telegram WebApp ready');
+            return true;
+          }
+          return false;
+        }
+
+        // Ждем загрузки скрипта telegram-web-app.js
+        function waitForTelegram() {
+          if (initTg()) {
+            console.log('✅ Telegram loaded, starting React');
+            startReactApp();
           } else {
-            console.warn('⚠️ WebApp not ready yet, retrying...');
-            setTimeout(initTg, 500); // увеличиваем задержку до 500мс
+            console.warn('⚠️ Waiting for Telegram...');
+            setTimeout(waitForTelegram, 100);
           }
         }
 
-        // Запускаем как можно раньше
-        window.addEventListener('TelegramWebAppReady', initTg, { once: true });
-        
-        // Ждем загрузки скрипта
+        // Запускаем ожидание
         if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', initTg);
+          document.addEventListener('DOMContentLoaded', waitForTelegram);
         } else {
-          // Даем 100мс на загрузку скрипта telegram-web-app.js
-          setTimeout(initTg, 100);
+          waitForTelegram();
         }
+
+        // Функция запуска React (будет вызвана после загрузки Telegram)
+        function startReactApp() {
 
         // Конфигурация API
         const API_URL = 'https://ph-mp-api.vercel.app';
@@ -311,30 +318,21 @@
 
             // Функция отправки заказа
             const handleOrder = async (phonesToOrder) => {
-                console.log('🚀 handleOrder called');
-                console.log('tg =', tg);
-                console.log('tgReady =', tgReady);
-                console.log('window.Telegram =', window.Telegram);
-                
                 if (!tg) {
-                    console.error('❌ tg is NULL');
-                    alert('DEBUG: tg is NULL\n\ntgReady: ' + tgReady + '\nwindow.Telegram: ' + !!window.Telegram + '\n\nПерезавантажте додаток');
-                    setOrderError('Telegram не готовий. Перезавантажте додаток.');
+                    alert('Помилка: Telegram не ініціалізовано. Перезавантажте додаток.');
                     return;
                 }
-                
-                console.log('✅ tg initialized:', tg);
                 
                 try {
                     setOrdering(true);
                     setOrderError('');
 
-                    // Пробуем получить данные пользователя разными способами
+                    // Получаем данные пользователя
                     let user = tg.initDataUnsafe?.user;
                     let userId = user?.id;
                     let username = user?.username;
                     
-                    // Fallback для Desktop - парсим initData строку
+                    // Fallback - парсим initData
                     if (!userId && tg.initData) {
                         try {
                             const params = new URLSearchParams(tg.initData);
@@ -347,10 +345,6 @@
                         } catch (e) {
                             console.error('Failed to parse initData:', e);
                         }
-                    }
-                    
-                    if (!userId) {
-                        alert('DEBUG: No userId found!\ninitDataUnsafe: ' + JSON.stringify(tg.initDataUnsafe) + '\ninitData: ' + tg.initData);
                     }
                     
                     const orderData = {
@@ -368,10 +362,6 @@
                     });
 
                     const data = await response.json();
-                    
-                    if (!response.ok) {
-                        alert('DEBUG: Server error!\nStatus: ' + response.status + '\nError: ' + (data.error || 'Unknown'));
-                    }
 
                     if (data.success) {
                         alert('✅ Замовлення відправлено!\n\nОчікуйте відповіді менеджера.');
@@ -383,8 +373,7 @@
 
                 } catch (error) {
                     console.error('❌ Помилка замовлення:', error);
-                    alert('DEBUG: Exception!\n' + error.message);
-                    setOrderError('Помилка при відправці замовлення. Спробуйте ще раз.');
+                    setOrderError(error.message || 'Помилка при відправці замовлення. Спробуйте ще раз.');
                 } finally {
                     setOrdering(false);
                 }
@@ -1275,8 +1264,9 @@
         `;
         document.head.appendChild(styleSheet);
 
-        // Рендер приложения
+        // Рендер приложения - вызывается только после загрузки Telegram
         ReactDOM.render(<PhoneMarketplace />, document.getElementById('root'));
+        } // конец функции startReactApp
     </script>
 </body>
 </html>
