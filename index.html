@@ -16,40 +16,10 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // Безопасная инициализация Telegram WebApp
-        let tg = null;
-
-        function initTg() {
-          if (window.Telegram && window.Telegram.WebApp) {
-            tg = window.Telegram.WebApp;
-            tg.ready();
-            tg.expand();
-            console.log('✅ Telegram WebApp ready');
-            return true;
-          }
-          return false;
-        }
-
-        // Ждем загрузки скрипта telegram-web-app.js
-        function waitForTelegram() {
-          if (initTg()) {
-            console.log('✅ Telegram loaded, starting React');
-            startReactApp();
-          } else {
-            console.warn('⚠️ Waiting for Telegram...');
-            setTimeout(waitForTelegram, 100);
-          }
-        }
-
-        // Запускаем ожидание
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', waitForTelegram);
-        } else {
-          waitForTelegram();
-        }
-
-        // Функция запуска React (будет вызвана после загрузки Telegram)
-        function startReactApp() {
+        // Инициализация Telegram WebApp
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
 
         // Конфигурация API
         const API_URL = 'https://ph-mp-api.vercel.app';
@@ -123,7 +93,7 @@
             const [selectedForOrder, setSelectedForOrder] = useState([]);
             const [orderError, setOrderError] = useState('');
             const [ordering, setOrdering] = useState(false);
-            const [sameDigitsFilter, setSameDigitsFilter] = useState('all'); // 'all', '5', '6', '7'
+            const [sameDigitsFilter, setSameDigitsFilter] = useState('all');
             
             // Короткие названия для отображения в select
             const sortLabels = {
@@ -198,17 +168,13 @@
                 return digits.slice(-7);
             };
 
-            // Подсчёт максимального количества одинаковых цифр в последних 7
+            // Подсчёт максимального количества одинаковых цифр
             const countMaxSameDigits = (number) => {
                 const lastSeven = getLastSevenDigits(number);
                 const digitCounts = {};
-                
-                // Подсчитываем частоту каждой цифры
                 for (let digit of lastSeven) {
                     digitCounts[digit] = (digitCounts[digit] || 0) + 1;
                 }
-                
-                // Возвращаем максимальное количество
                 return Math.max(...Object.values(digitCounts));
             };
 
@@ -300,12 +266,7 @@
             };
 
             // Контакт с продавцом
-            // Контакт с продавцом
             const contactSeller = (phone) => {
-                if (!tg) {
-                    console.warn('tg not initialized yet');
-                    return;
-                }
                 const message = `Вітаю! Цікавить номер ${phone.number} за ${phone.price.toLocaleString('uk-UA')} грн.`;
                 tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(message)}`);
             };
@@ -318,47 +279,22 @@
 
             // Функция отправки заказа
             const handleOrder = async (phonesToOrder) => {
-                if (!tg) {
-                    alert('Помилка: Telegram не ініціалізовано. Перезавантажте додаток.');
-                    return;
-                }
-                
                 try {
                     setOrdering(true);
                     setOrderError('');
 
-                    // Получаем данные пользователя
-                    let user = tg.initDataUnsafe?.user;
-                    let userId = user?.id;
-                    let username = user?.username;
-                    
-                    // Fallback - парсим initData
-                    if (!userId && tg.initData) {
-                        try {
-                            const params = new URLSearchParams(tg.initData);
-                            const userStr = params.get('user');
-                            if (userStr) {
-                                const userData = JSON.parse(decodeURIComponent(userStr));
-                                userId = userData.id;
-                                username = userData.username;
-                            }
-                        } catch (e) {
-                            console.error('Failed to parse initData:', e);
-                        }
-                    }
-                    
-                    const orderData = {
-                        phones: phonesToOrder,
-                        username: username || 'невідомий',
-                        userId: userId
-                    };
+                    const user = tg.initDataUnsafe?.user;
                     
                     const response = await fetch(`${API_URL}/api/order`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify(orderData)
+                        body: JSON.stringify({
+                            phones: phonesToOrder,
+                            username: user?.username || 'невідомий',
+                            userId: user?.id
+                        })
                     });
 
                     const data = await response.json();
@@ -372,8 +308,8 @@
                     }
 
                 } catch (error) {
-                    console.error('❌ Помилка замовлення:', error);
-                    setOrderError(error.message || 'Помилка при відправці замовлення. Спробуйте ще раз.');
+                    console.error('Помилка замовлення:', error);
+                    setOrderError('Помилка при відправці замовлення. Спробуйте ще раз.');
                 } finally {
                     setOrdering(false);
                 }
@@ -390,18 +326,13 @@
 
             // Заказ выбранных номеров из Обране
             const orderSelected = () => {
-                console.log('🛒 orderSelected called');
-                console.log('📋 selectedForOrder:', selectedForOrder);
-                
                 if (selectedForOrder.length === 0) {
-                    console.warn('⚠️ No phones selected');
                     setOrderError('Оберіть хоча б один номер');
                     setTimeout(() => setOrderError(''), 3000);
                     return;
                 }
 
                 const phonesToOrder = phones.filter(p => selectedForOrder.includes(p.id));
-                console.log('📱 Phones to order:', phonesToOrder);
                 handleOrder(phonesToOrder);
             };
 
@@ -506,40 +437,16 @@
                                 <div style={styles.sameDigitsFilter}>
                                     <div style={styles.sameDigitsLabel}>однакових в номері</div>
                                     <div style={styles.sameDigitsButtons}>
-                                        <button
-                                            style={{
-                                                ...styles.sameDigitsBtn,
-                                                ...(sameDigitsFilter === 'all' ? styles.sameDigitsBtnActive : {})
-                                            }}
-                                            onClick={() => setSameDigitsFilter('all')}
-                                        >
+                                        <button style={{...styles.sameDigitsBtn, ...(sameDigitsFilter === 'all' ? styles.sameDigitsBtnActive : {})}} onClick={() => setSameDigitsFilter('all')}>
                                             всі
                                         </button>
-                                        <button
-                                            style={{
-                                                ...styles.sameDigitsBtn,
-                                                ...(sameDigitsFilter === '5' ? styles.sameDigitsBtnActive : {})
-                                            }}
-                                            onClick={() => setSameDigitsFilter('5')}
-                                        >
+                                        <button style={{...styles.sameDigitsBtn, ...(sameDigitsFilter === '5' ? styles.sameDigitsBtnActive : {})}} onClick={() => setSameDigitsFilter('5')}>
                                             5
                                         </button>
-                                        <button
-                                            style={{
-                                                ...styles.sameDigitsBtn,
-                                                ...(sameDigitsFilter === '6' ? styles.sameDigitsBtnActive : {})
-                                            }}
-                                            onClick={() => setSameDigitsFilter('6')}
-                                        >
+                                        <button style={{...styles.sameDigitsBtn, ...(sameDigitsFilter === '6' ? styles.sameDigitsBtnActive : {})}} onClick={() => setSameDigitsFilter('6')}>
                                             6
                                         </button>
-                                        <button
-                                            style={{
-                                                ...styles.sameDigitsBtn,
-                                                ...(sameDigitsFilter === '7' ? styles.sameDigitsBtnActive : {})
-                                            }}
-                                            onClick={() => setSameDigitsFilter('7')}
-                                        >
+                                        <button style={{...styles.sameDigitsBtn, ...(sameDigitsFilter === '7' ? styles.sameDigitsBtnActive : {})}} onClick={() => setSameDigitsFilter('7')}>
                                             7
                                         </button>
                                     </div>
@@ -1264,9 +1171,8 @@
         `;
         document.head.appendChild(styleSheet);
 
-        // Рендер приложения - вызывается только после загрузки Telegram
+        // Рендер приложения
         ReactDOM.render(<PhoneMarketplace />, document.getElementById('root'));
-        } // конец функции startReactApp
     </script>
 </body>
 </html>
