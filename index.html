@@ -317,8 +317,9 @@
                 }
                 
                 console.log('✅ tg initialized:', tg);
-                console.log('🔍 initDataUnsafe:', tg.initDataUnsafe);
+                console.log('🔍 initDataUnsafe:', JSON.stringify(tg.initDataUnsafe));
                 console.log('🔍 initData:', tg.initData);
+                console.log('🔍 Full tg object keys:', Object.keys(tg));
                 
                 try {
                     setOrdering(true);
