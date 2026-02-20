@@ -329,14 +329,12 @@
                 
                 if (!telegramApp) {
                     console.error('❌ telegramApp is not initialized');
+                    alert('DEBUG: telegramApp is NULL');
                     setOrderError('Telegram не готовий. Спробуйте ще раз через секунду.');
                     return;
                 }
                 
                 console.log('✅ telegramApp initialized:', telegramApp);
-                console.log('🔍 initDataUnsafe:', JSON.stringify(telegramApp.initDataUnsafe));
-                console.log('🔍 initData:', telegramApp.initData);
-                console.log('🔍 Full tg object keys:', Object.keys(telegramApp));
                 
                 try {
                     setOrdering(true);
@@ -349,7 +347,6 @@
                     
                     // Fallback для Desktop - парсим initData строку
                     if (!userId && telegramApp.initData) {
-                        console.log('🔄 Trying to parse initData string...');
                         try {
                             const params = new URLSearchParams(telegramApp.initData);
                             const userStr = params.get('user');
@@ -357,21 +354,21 @@
                                 const userData = JSON.parse(decodeURIComponent(userStr));
                                 userId = userData.id;
                                 username = userData.username;
-                                console.log('✅ Parsed user from initData:', userData);
                             }
                         } catch (e) {
                             console.error('Failed to parse initData:', e);
                         }
                     }
                     
-                    console.log('👤 Final user data:', { userId, username });
+                    if (!userId) {
+                        alert('DEBUG: No userId found!\ninitDataUnsafe: ' + JSON.stringify(telegramApp.initDataUnsafe) + '\ninitData: ' + telegramApp.initData);
+                    }
                     
                     const orderData = {
                         phones: phonesToOrder,
                         username: username || 'невідомий',
                         userId: userId
                     };
-                    console.log('📦 Sending order data:', orderData);
                     
                     const response = await fetch(`${API_URL}/api/order`, {
                         method: 'POST',
@@ -381,12 +378,13 @@
                         body: JSON.stringify(orderData)
                     });
 
-                    console.log('📥 Response status:', response.status);
                     const data = await response.json();
-                    console.log('📥 Response data:', data);
+                    
+                    if (!response.ok) {
+                        alert('DEBUG: Server error!\nStatus: ' + response.status + '\nError: ' + (data.error || 'Unknown'));
+                    }
 
                     if (data.success) {
-                        console.log('✅ Order successful');
                         alert('✅ Замовлення відправлено!\n\nОчікуйте відповіді менеджера.');
                         setSelectedForOrder([]);
                         if (selectedPhone) setSelectedPhone(null);
@@ -396,6 +394,7 @@
 
                 } catch (error) {
                     console.error('❌ Помилка замовлення:', error);
+                    alert('DEBUG: Exception!\n' + error.message);
                     setOrderError('Помилка при відправці замовлення. Спробуйте ще раз.');
                 } finally {
                     setOrdering(false);
