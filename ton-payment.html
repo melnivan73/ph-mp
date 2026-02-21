@@ -330,7 +330,10 @@
         async function initTonConnect() {
             tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
                 manifestUrl: 'https://ph-mp.vercel.app/tonconnect-manifest.json',
-                buttonRootId: 'ton-connect-button'
+                buttonRootId: 'ton-connect-button',
+                actionsConfiguration: {
+                    twaReturnUrl: 'https://t.me/goldnumbersuashop_bot/gold_numbers'
+                }
             });
 
             tonConnectUI.onStatusChange(wallet => {
