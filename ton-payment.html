@@ -323,6 +323,7 @@
         let tonConnectUI = null;
         let checkInterval = null;
         let paymentCompleted = false;
+        let paymentAttempted = false;
 
         console.log('TON Payment page loaded, orderId:', orderId);
 
@@ -409,6 +410,7 @@
             }
 
             const payButton = document.getElementById('payButton');
+            paymentAttempted = true;
             payButton.disabled = true;
             payButton.innerHTML = '<span class="loading-spinner"></span>Відправка...';
 
@@ -457,18 +459,7 @@
                 await notifyPaymentCancelled();
 
                 if (isInsufficientFunds) {
-                    // Показываем кнопку наложенного платежа
-                    showStatus('❌ Недостатньо коштів на гаманці', 'error');
-                    const statusEl = document.getElementById('status');
-                    const cashFallback = document.createElement('div');
-                    cashFallback.style.cssText = 'margin-top:16px;text-align:center;';
-                    cashFallback.innerHTML = `
-                        <button onclick="switchToCash()" style="background:#28a745;color:#fff;border:none;border-radius:12px;padding:14px 24px;font-size:16px;font-weight:700;cursor:pointer;width:100%;">
-                            💵 Відправити накладеним платежем
-                        </button>`;
-                    if (statusEl && statusEl.parentNode) {
-                        statusEl.parentNode.insertBefore(cashFallback, statusEl.nextSibling);
-                    }
+                    showInsufficientFundsUI();
                 } else {
                     setTimeout(() => {
                         if (tg) tg.close();
@@ -476,6 +467,24 @@
                     }, 500);
                 }
             }
+        }
+
+        // Показываем UI недостаточно средств
+        function showInsufficientFundsUI() {
+            const payButton = document.getElementById('payButton');
+            const cashButton = document.getElementById('cashButton');
+            
+            // Меняем кнопку "Оплатити" на кнопку наложенного платежа
+            payButton.style.display = 'none';
+            
+            // Создаём яркую кнопку
+            const cashFallback = document.createElement('button');
+            cashFallback.textContent = '💵 Відправити накладеним платежем';
+            cashFallback.style.cssText = 'background:#28a745;color:#fff;border:none;border-radius:12px;padding:16px 24px;font-size:16px;font-weight:700;cursor:pointer;width:100%;margin-top:12px;display:block;';
+            cashFallback.onclick = switchToCash;
+            payButton.parentNode.insertBefore(cashFallback, cashButton);
+            
+            showStatus('❌ Недостатньо коштів. Оберіть накладений платіж.', 'error');
         }
 
         // Переключение на наложенный платёж после ошибки TON
@@ -650,6 +659,19 @@
             console.log('🔄 Page hiding, paymentCompleted:', paymentCompleted);
             if (!paymentCompleted) {
                 notifyPaymentCancelledBeacon();
+            }
+        });
+
+        // Когда пользователь возвращается в Mini App после кошелька
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible' && paymentAttempted && !paymentCompleted) {
+                setTimeout(() => {
+                    const payButton = document.getElementById('payButton');
+                    // Если кнопка ещё в состоянии "Відправка..." — значит транзакция не прошла
+                    if (payButton && payButton.innerHTML.includes('Відправка')) {
+                        showInsufficientFundsUI();
+                    }
+                }, 800);
             }
         });
 
