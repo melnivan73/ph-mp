@@ -562,12 +562,19 @@
         // Уведомление об отмене - сначала пробуем fetch, потом sendBeacon
         async function notifyPaymentCancelled() {
             console.log('📤 Notifying payment cancellation...');
+            const cancelData = {
+                orderId: orderId,
+                phones: orderData ? orderData.phones : [],
+                totalUah: orderData ? orderData.totalUah : 0,
+                username: urlParams.get('username') || 'невідомий',
+                userId: urlParams.get('userId') || null
+            };
             try {
                 const response = await fetch(`${API_URL}/api/ton-payment-cancelled`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ orderId: orderId }),
-                    keepalive: true // Важно для отправки при закрытии страницы
+                    body: JSON.stringify(cancelData),
+                    keepalive: true
                 });
                 const result = await response.json();
                 console.log('✅ Cancellation notified via fetch:', result);
@@ -581,7 +588,13 @@
         // Уведомление об отмене используя sendBeacon (fallback)
         function notifyPaymentCancelledBeacon() {
             console.log('📤 Sending cancellation via sendBeacon...');
-            const data = JSON.stringify({ orderId: orderId });
+            const data = JSON.stringify({
+                orderId: orderId,
+                phones: orderData ? orderData.phones : [],
+                totalUah: orderData ? orderData.totalUah : 0,
+                username: urlParams.get('username') || 'невідомий',
+                userId: urlParams.get('userId') || null
+            });
             const blob = new Blob([data], { type: 'application/json' });
             
             if (navigator.sendBeacon) {
