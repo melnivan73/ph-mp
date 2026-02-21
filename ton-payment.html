@@ -529,13 +529,19 @@
                     paymentCompleted = true;
                     cashButton.textContent = '✅ Прийнято';
                     showStatus('✅ Замовлення прийнято! Оплата при отриманні.', 'success');
+                    // Показываем кнопку возврата в бот
                     setTimeout(() => {
-                        // Пробуем все способы закрыть и перейти в бот
-                        const webapp = tg || (window.Telegram && window.Telegram.WebApp);
-                        if (webapp) {
-                            try { webapp.close(); } catch(e) {}
-                        }
-                    }, 1500);
+                        const container = cashButton.parentNode;
+                        const backBtn = document.createElement('button');
+                        backBtn.textContent = '⬅️ Повернутись в бот';
+                        backBtn.style.cssText = 'background:#667eea;color:#fff;border:none;border-radius:12px;padding:14px 24px;font-size:16px;font-weight:700;cursor:pointer;width:100%;margin-top:12px;display:block;';
+                        backBtn.onclick = function() {
+                            const webapp = tg || (window.Telegram && window.Telegram.WebApp);
+                            try { if (webapp) webapp.close(); } catch(e) {}
+                            window.location.href = 'https://t.me/goldnumbersuashop_bot';
+                        };
+                        container.appendChild(backBtn);
+                    }, 500);
                 } else {
                     throw new Error(result.error);
                 }
