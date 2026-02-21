@@ -307,6 +307,17 @@
         let selectedCity = null;
         let citiesTimeout = null;
 
+        // Закрытие Mini App
+        function closeApp() {
+            if (tg) {
+                tg.close();
+            } else if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.close();
+            } else {
+                window.location.href = 'https://t.me/goldnumbersuashop_bot';
+            }
+        }
+
         if (!orderId) {
             root.innerHTML = '<div class="container"><div style="text-align:center;padding:60px 20px"><h2>❌ Помилка</h2><p>ID замовлення не знайдено</p></div></div>';
         } else {
@@ -524,7 +535,7 @@
                         window.location.href = `https://ph-mp.vercel.app/ton-payment.html?orderId=${orderId}`;
                     } else {
                         // Показываем успех для наличных
-                        root.innerHTML = '<div class="container"><div class="success-box"><div class="success-icon">✅</div><h2 class="success-title">Замовлення прийнято!</h2><p class="success-text">Оплата при отриманні.<br>Менеджер зв\'яжеться з вами для підтвердження.</p><button class="close-btn" onclick="if(window.Telegram && window.Telegram.WebApp) { window.Telegram.WebApp.close(); } else { window.history.back(); }">Закрити</button></div></div>';
+                        root.innerHTML = '<div class="container"><div class="success-box"><div class="success-icon">✅</div><h2 class="success-title">Замовлення прийнято!</h2><p class="success-text">Оплата при отриманні.<br>Менеджер зв\'яжеться з вами для підтвердження.</p><button class="close-btn" onclick="closeApp()">Закрити</button></div></div>';
                     }
                 } else {
                     throw new Error(result.error || 'Помилка відправки');
