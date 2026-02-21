@@ -376,23 +376,19 @@
                         userId: userId
                     };
                     
-                    const response = await fetch(`${API_URL}/api/order`, {
+                    // Показываем модал сразу — не ждём ответа сервера (оптимистичный UI)
+                    setSuccessModal(true);
+                    setSelectedForOrder([]);
+                    if (selectedPhone) setSelectedPhone(null);
+
+                    // Отправляем запрос в фоне
+                    fetch(`${API_URL}/api/order`, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(orderData)
-                    });
-
-                    const data = await response.json();
-
-                    if (data.success) {
-                        setSuccessModal(true);
-                        setSelectedForOrder([]);
-                        if (selectedPhone) setSelectedPhone(null);
-                    } else {
-                        throw new Error(data.error || 'Помилка відправки');
-                    }
+                    }).then(r => r.json()).then(data => {
+                        if (!data.success) console.error('Order error:', data.error);
+                    }).catch(e => console.error('Order fetch error:', e));
 
                 } catch (error) {
                     console.error('❌ Помилка замовлення:', error);
