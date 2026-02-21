@@ -528,20 +528,8 @@
                 if (result.success) {
                     paymentCompleted = true;
                     cashButton.textContent = '✅ Прийнято';
-                    showStatus('✅ Замовлення прийнято! Оплата при отриманні.', 'success');
-                    // Показываем кнопку возврата в бот
-                    setTimeout(() => {
-                        const container = cashButton.parentNode;
-                        const backBtn = document.createElement('button');
-                        backBtn.textContent = '⬅️ Повернутись в бот';
-                        backBtn.style.cssText = 'background:#667eea;color:#fff;border:none;border-radius:12px;padding:14px 24px;font-size:16px;font-weight:700;cursor:pointer;width:100%;margin-top:12px;display:block;';
-                        backBtn.onclick = function() {
-                            const webapp = tg || (window.Telegram && window.Telegram.WebApp);
-                            try { if (webapp) webapp.close(); } catch(e) {}
-                            window.location.href = 'https://t.me/goldnumbersuashop_bot';
-                        };
-                        container.appendChild(backBtn);
-                    }, 500);
+                    // Показываем модальное окно
+                    setTimeout(() => showSuccessModal(), 500);
                 } else {
                     throw new Error(result.error);
                 }
@@ -658,6 +646,32 @@
         }
 
         // Показать статус
+        function showSuccessModal() {
+            // Создаём модальное окно поверх всего
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+            modal.innerHTML = `
+                <div style="background:#1e2d3d;border-radius:16px;padding:28px 24px;max-width:320px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+                    <div style="font-size:48px;margin-bottom:12px;">✅</div>
+                    <h3 style="margin:0 0 8px;font-size:18px;font-weight:700;color:#fff;">Замовлення прийнято!</h3>
+                    <p style="margin:0 0 20px;color:#a0aec0;font-size:15px;">Оплата при отриманні.<br>Менеджер зв'яжеться з вами.</p>
+                    <button onclick="goToBot()" style="background:#667eea;color:#fff;border:none;border-radius:10px;padding:14px 32px;font-size:16px;font-weight:600;cursor:pointer;width:100%;">
+                        ⬅️ Повернутись в бот
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        window.goToBot = function() {
+            try {
+                const webapp = tg || (window.Telegram && window.Telegram.WebApp);
+                if (webapp) webapp.close();
+            } catch(e) {}
+            // Открываем бот через Telegram ссылку
+            window.open('https://t.me/goldnumbersuashop_bot', '_blank');
+        };
+
         function showStatus(message, type) {
             const statusEl = document.getElementById('statusMessage');
             statusEl.textContent = message;
