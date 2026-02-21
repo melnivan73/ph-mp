@@ -307,8 +307,8 @@
         let selectedCity = null;
         let citiesTimeout = null;
 
-        // Закрытие Mini App
-        function closeApp() {
+        // Закрытие Mini App — window. чтобы была доступна из innerHTML onclick
+        window.closeApp = function() {
             if (tg) {
                 tg.close();
             } else if (window.Telegram && window.Telegram.WebApp) {
