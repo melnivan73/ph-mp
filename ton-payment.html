@@ -511,10 +511,6 @@
 
         // Оплата при получении
         async function payByCash() {
-            if (!confirm('Оплата при отриманні?')) {
-                return;
-            }
-
             const cashButton = document.getElementById('cashButton');
             cashButton.disabled = true;
             cashButton.textContent = 'Обробка...';
