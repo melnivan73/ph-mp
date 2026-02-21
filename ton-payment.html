@@ -446,15 +446,58 @@
 
             } catch (error) {
                 console.error('❌ Payment error:', error);
-                
-                // Используем обычный fetch с keepalive
+
+                const errMsg = (error.message || '').toLowerCase();
+                const isInsufficientFunds = 
+                    errMsg.includes('insufficient') || 
+                    errMsg.includes('balance') ||
+                    errMsg.includes('not enough') ||
+                    errMsg.includes('недостатн');
+
                 await notifyPaymentCancelled();
-                
-                // Закрываем WebApp
-                setTimeout(() => {
-                    tg.close();
-                }, 500);
+
+                if (isInsufficientFunds) {
+                    // Показываем кнопку наложенного платежа
+                    showStatus('❌ Недостатньо коштів на гаманці', 'error');
+                    const statusEl = document.getElementById('status');
+                    const cashFallback = document.createElement('div');
+                    cashFallback.style.cssText = 'margin-top:16px;text-align:center;';
+                    cashFallback.innerHTML = `
+                        <button onclick="switchToCash()" style="background:#28a745;color:#fff;border:none;border-radius:12px;padding:14px 24px;font-size:16px;font-weight:700;cursor:pointer;width:100%;">
+                            💵 Відправити накладеним платежем
+                        </button>`;
+                    if (statusEl && statusEl.parentNode) {
+                        statusEl.parentNode.insertBefore(cashFallback, statusEl.nextSibling);
+                    }
+                } else {
+                    setTimeout(() => {
+                        if (tg) tg.close();
+                        else window.location.href = 'https://t.me/goldnumbersuashop_bot';
+                    }, 500);
+                }
             }
+        }
+
+        // Переключение на наложенный платёж после ошибки TON
+        window.switchToCash = async function() {
+            try {
+                const response = await fetch(`${API_URL}/api/pay-by-cash`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orderId: orderId })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    paymentCompleted = true;
+                }
+            } catch(e) {
+                console.error('switchToCash error:', e);
+            }
+            // В любом случае закрываем и идём в бот
+            try { if (tg) tg.close(); } catch(e) {}
+            setTimeout(() => {
+                window.location.href = 'https://t.me/goldnumbersuashop_bot';
+            }, 300);
         }
 
         // Оплата при получении
