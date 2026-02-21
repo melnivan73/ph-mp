@@ -530,8 +530,15 @@
                     cashButton.textContent = '✅ Прийнято';
                     showStatus('✅ Замовлення прийнято! Оплата при отриманні.', 'success');
                     setTimeout(() => {
-                        try { if (tg) tg.close(); } catch(e) {}
-                        window.location.href = 'https://t.me/goldnumbersuashop_bot';
+                        try {
+                            if (tg) {
+                                tg.openTelegramLink('https://t.me/goldnumbersuashop_bot');
+                            } else if (window.Telegram?.WebApp) {
+                                window.Telegram.WebApp.openTelegramLink('https://t.me/goldnumbersuashop_bot');
+                            }
+                        } catch(e) {
+                            window.location.href = 'https://t.me/goldnumbersuashop_bot';
+                        }
                     }, 1500);
                 } else {
                     throw new Error(result.error);
