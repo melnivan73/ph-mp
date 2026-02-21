@@ -289,6 +289,15 @@
         initTg();
 
         const API_URL = 'https://ph-mp-api.vercel.app';
+
+        const VALID_CODES = ['067','068','096','097','098','077','050','066','095','099','075','063','073','093'];
+        
+        function validatePhone(digits) {
+            if (digits.length !== 10) return { ok: false, msg: 'Введіть коректний номер (10 цифр)' };
+            const code = digits.slice(0, 3);
+            if (!VALID_CODES.includes(code)) return { ok: false, msg: `Невірний код оператора. Дозволені: ${VALID_CODES.join(', ')}` };
+            return { ok: true };
+        }
         
         const urlParams = new URLSearchParams(window.location.search);
         const orderId = urlParams.get('orderId');
@@ -409,9 +418,16 @@
                 e.target.value = formatted;
                 
                 // Валидация
-                if (value.length > 0 && value.length !== 10) {
-                    phoneError.classList.add('show');
-                    phoneInput.style.borderColor = '#ef4444';
+                if (value.length > 0) {
+                    const v = validatePhone(value);
+                    if (!v.ok) {
+                        phoneError.textContent = v.msg;
+                        phoneError.classList.add('show');
+                        phoneInput.style.borderColor = '#ef4444';
+                    } else {
+                        phoneError.classList.remove('show');
+                        phoneInput.style.borderColor = '#2d3748';
+                    }
                 } else {
                     phoneError.classList.remove('show');
                     phoneInput.style.borderColor = '#2d3748';
@@ -457,10 +473,12 @@
 
             // Проверка телефона
             const digitsOnly = phone.replace(/\D/g, '');
-            if (digitsOnly.length !== 10) {
-                errorMessage.textContent = 'Введіть коректний номер телефону (10 цифр)';
+            const phoneValidation = validatePhone(digitsOnly);
+            if (!phoneValidation.ok) {
+                errorMessage.textContent = phoneValidation.msg;
                 errorMessage.classList.add('show');
                 phoneInput.style.borderColor = '#ef4444';
+                document.getElementById('phoneError').textContent = phoneValidation.msg;
                 document.getElementById('phoneError').classList.add('show');
                 return;
             }
@@ -506,7 +524,7 @@
                         window.location.href = `https://ph-mp.vercel.app/ton-payment.html?orderId=${orderId}`;
                     } else {
                         // Показываем успех для наличных
-                        root.innerHTML = '<div class="container"><div class="success-box"><div class="success-icon">✅</div><h2 class="success-title">Замовлення прийнято!</h2><p class="success-text">Оплата при отриманні.<br>Менеджер зв\'яжеться з вами для підтвердження.</p><button class="close-btn" onclick="if(window.Telegram && window.Telegram.WebApp) window.Telegram.WebApp.close();">Закрити</button></div></div>';
+                        root.innerHTML = '<div class="container"><div class="success-box"><div class="success-icon">✅</div><h2 class="success-title">Замовлення прийнято!</h2><p class="success-text">Оплата при отриманні.<br>Менеджер зв\'яжеться з вами для підтвердження.</p><button class="close-btn" onclick="if(window.Telegram && window.Telegram.WebApp) { window.Telegram.WebApp.close(); } else { window.history.back(); }">Закрити</button></div></div>';
                     }
                 } else {
                     throw new Error(result.error || 'Помилка відправки');
