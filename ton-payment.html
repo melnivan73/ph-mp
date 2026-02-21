@@ -523,9 +523,11 @@
                 });
 
                 const result = await response.json();
+                console.log('pay-by-cash result:', JSON.stringify(result));
 
                 if (result.success) {
                     paymentCompleted = true;
+                    cashButton.textContent = '✅ Прийнято';
                     showStatus('✅ Замовлення прийнято! Оплата при отриманні.', 'success');
                     setTimeout(() => {
                         try { if (tg) tg.close(); } catch(e) {}
