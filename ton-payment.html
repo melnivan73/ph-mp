@@ -531,7 +531,12 @@
                 if (result.success) {
                     paymentCompleted = true;
                     showStatus('✅ Замовлення прийнято! Оплата при отриманні.', 'success');
-                    setTimeout(() => tg.close(), 2000);
+                    setTimeout(() => {
+                        try { if (tg) tg.close(); } catch(e) {}
+                        setTimeout(() => {
+                            window.location.href = 'https://t.me/goldnumbersuashop_bot';
+                        }, 300);
+                    }, 2000);
                 } else {
                     throw new Error(result.error);
                 }
