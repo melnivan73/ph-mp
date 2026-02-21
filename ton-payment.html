@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Оплата TON</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+    <script src="https://unpkg.com/@tonconnect/ui@2.0.6/dist/tonconnect-ui.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * {
@@ -300,9 +300,18 @@
     </div>
 
     <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.ready();
+        // Безопасная инициализация
+        let tg = null;
+        function initTg() {
+            if (window.Telegram && window.Telegram.WebApp) {
+                tg = window.Telegram.WebApp;
+                tg.ready();
+                tg.expand();
+            } else {
+                setTimeout(initTg, 200);
+            }
+        }
+        initTg();
 
         const API_URL = 'https://ph-mp-api.vercel.app';
         const MERCHANT_WALLET = 'UQA3soK4ABEWcsjblRdxW2bBd8Wgfli4WjURqr4p3s-eHpx5';
@@ -336,15 +345,34 @@
             });
         }
 
-        // Загрузка данных заказа
-        async function loadOrderData() {
+        // Загрузка данных заказа из URL параметров (надёжнее чем API на Vercel serverless)
+        function loadOrderData() {
+            const phones = urlParams.get('phones');
+            const totalUah = urlParams.get('totalUah');
+            const totalTon = urlParams.get('totalTon');
+            const tonRate = urlParams.get('tonRate');
+
+            if (phones && totalUah && totalTon && tonRate) {
+                orderData = {
+                    phones: phones.split(',').map(n => ({ number: n })),
+                    totalUah: parseFloat(totalUah),
+                    totalTonWithDiscount: parseFloat(totalTon),
+                    tonRate: parseFloat(tonRate)
+                };
+                console.log('Order data from URL:', orderData);
+                displayOrderInfo();
+            } else {
+                // Fallback на API если параметров нет в URL
+                fetchOrderFromApi();
+            }
+        }
+
+        async function fetchOrderFromApi() {
             try {
                 const response = await fetch(`${API_URL}/api/order-details/${orderId}`);
                 const result = await response.json();
-
                 if (result.success) {
                     orderData = result.data;
-                    console.log('Order data loaded:', orderData);
                     displayOrderInfo();
                 } else {
                     showStatus('❌ Замовлення не знайдено', 'error');
