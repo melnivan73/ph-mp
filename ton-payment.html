@@ -433,6 +433,9 @@
 
                 showStatus('⏳ Підтвердіть транзакцію у гаманці...', 'info');
 
+                // Показываем модалку сразу — если вернётся без оплаты, она уже будет на экране
+                showCashModal();
+
                 console.log('💎 Sending transaction...');
                 const result = await tonConnectUI.sendTransaction(transaction);
                 
@@ -441,6 +444,9 @@
                 if (result) {
                     paymentCompleted = true;
                     try { localStorage.removeItem('ton_pending_orderId'); } catch(e) {}
+                    // Скрываем модалку — оплата прошла успешно
+                    const m = document.getElementById('cashFallbackModal');
+                    if (m) m.remove();
                     showStatus('✅ Транзакція відправлена! Очікуємо підтвердження...', 'success');
                     
                     await notifyBackend(result.boc);
@@ -461,6 +467,7 @@
         // Показываем модальное окно с кнопкой наложенного платежа
         function showCashModal() {
             const modal = document.createElement('div');
+            modal.id = 'cashFallbackModal';
             modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
             modal.innerHTML = `
                 <div style="background:#1e2d3d;border-radius:16px;padding:28px 24px;max-width:320px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
@@ -640,6 +647,7 @@
         function showSuccessModal() {
             // Создаём модальное окно поверх всего
             const modal = document.createElement('div');
+            modal.id = 'cashFallbackModal';
             modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
             modal.innerHTML = `
                 <div style="background:#1e2d3d;border-radius:16px;padding:28px 24px;max-width:320px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
