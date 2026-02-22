@@ -294,6 +294,11 @@
             💎 Оплатити <span id="payAmount">-</span> TON
         </button>
 
+        <!-- ТЕСТ: убрать после проверки -->
+        <button onclick="testTonSuccess()" style="background:#ff9800;color:#fff;border:none;border-radius:12px;padding:10px;font-size:13px;cursor:pointer;width:100%;margin-bottom:8px;">
+            🧪 ТЕСТ: Симулювати успішну оплату
+        </button>
+
         <button id="cashButton" class="cancel-btn">
             💵 Оплата при отриманні
         </button>
@@ -632,9 +637,7 @@
                         paymentCompleted = true;
                         showStatus('🎉 Оплата підтверджена! Замовлення прийнято.', 'success');
                         
-                        setTimeout(() => {
-                            tg.close();
-                        }, 3000);
+                        setTimeout(() => showTonSuccessModal(), 500);
                     } else if (attempts >= maxAttempts) {
                         clearInterval(checkInterval);
                         showStatus('⏰ Час очікування вичерпано. Зв\'яжіться з менеджером.', 'warning');
@@ -646,6 +649,27 @@
         }
 
         // Показать статус
+        function showTonSuccessModal() {
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+            modal.innerHTML = `
+                <div style="background:#1e2d3d;border-radius:16px;padding:28px 24px;max-width:320px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+                    <div style="font-size:48px;margin-bottom:12px;">✅</div>
+                    <h3 style="margin:0 0 8px;font-size:18px;font-weight:700;color:#fff;">Оплата прийнята!</h3>
+                    <p style="margin:0 0 20px;color:#a0aec0;font-size:15px;">Замовлення підтверджено.<br>Менеджер зв'яжеться з вами.</p>
+                    <button onclick="window.closeTonApp()" style="background:#667eea;color:#fff;border:none;border-radius:10px;padding:14px 32px;font-size:16px;font-weight:600;cursor:pointer;width:100%;">
+                        Закрити
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        window.closeTonApp = function() {
+            try { if (tg) tg.close(); } catch(e) {}
+            window.location.href = 'https://t.me/goldnumbersuashop_bot';
+        };
+
         function showSuccessModal() {
             // Создаём модальное окно поверх всего
             const modal = document.createElement('div');
@@ -712,6 +736,24 @@
                 }, 800);
             }
         });
+
+        // ТЕСТ: симуляция успешной TON оплаты (убрать после проверки)
+        window.testTonSuccess = async function() {
+            clearInterval(checkInterval);
+            paymentCompleted = true;
+            showStatus('🎉 Оплата підтверджена! Замовлення прийнято.', 'success');
+            
+            // Уведомляем сервер
+            try {
+                await fetch(`${API_URL}/api/ton-transaction`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orderId: orderId, boc: 'TEST_BOC', test: true })
+                });
+            } catch(e) {}
+
+            setTimeout(() => showTonSuccessModal(), 500);
+        };
 
         // Инициализация
         if (!orderId) {
