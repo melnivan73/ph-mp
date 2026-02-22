@@ -99,13 +99,25 @@
 
             // Проверяем вернулся ли пользователь из TON кошелька без оплаты
             useEffect(() => {
-                try {
-                    const pendingOrderId = localStorage.getItem('ton_pending_orderId');
-                    if (pendingOrderId) {
-                        localStorage.removeItem('ton_pending_orderId');
-                        setTonCashModal(pendingOrderId);
-                    }
-                } catch(e) {}
+                const checkStartParam = () => {
+                    try {
+                        let startParam = null;
+                        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
+                            startParam = window.Telegram.WebApp.initDataUnsafe.start_param;
+                        }
+                        if (!startParam) {
+                            const hash = window.location.hash;
+                            const match = hash.match(/startapp=([^&]+)/);
+                            if (match) startParam = decodeURIComponent(match[1]);
+                        }
+                        if (startParam && startParam.startsWith('cash_')) {
+                            const orderId = startParam.replace('cash_', '');
+                            setTonCashModal(orderId);
+                        }
+                    } catch(e) { console.error('startParam error:', e); }
+                };
+                // Ждём инициализации Telegram
+                setTimeout(checkStartParam, 500);
             }, []);
 
             useEffect(() => {
