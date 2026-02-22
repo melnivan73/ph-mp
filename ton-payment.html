@@ -667,7 +667,7 @@
 
         window.closeTonApp = function() {
             try { if (tg) tg.close(); } catch(e) {}
-            window.location.href = 'https://t.me/goldnumbersuashop_bot';
+            window.open('https://t.me/goldnumbersuashop_bot', '_blank');
         };
 
         function showSuccessModal() {
@@ -743,14 +743,14 @@
             paymentCompleted = true;
             showStatus('🎉 Оплата підтверджена! Замовлення прийнято.', 'success');
             
-            // Уведомляем сервер
+            // Уведомляем сервер через тестовый эндпоинт
             try {
-                await fetch(`${API_URL}/api/ton-transaction`, {
+                await fetch(`${API_URL}/api/ton-test-confirm`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ orderId: orderId, boc: 'TEST_BOC', test: true })
+                    body: JSON.stringify({ orderId: orderId })
                 });
-            } catch(e) {}
+            } catch(e) { console.error(e); }
 
             setTimeout(() => showTonSuccessModal(), 500);
         };
