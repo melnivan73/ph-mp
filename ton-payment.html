@@ -411,6 +411,8 @@
 
             const payButton = document.getElementById('payButton');
             paymentAttempted = true;
+            // Сохраняем orderId чтобы index.html показал модалку если вернёмся
+            try { localStorage.setItem('ton_pending_orderId', orderId); } catch(e) {}
             payButton.disabled = true;
             payButton.innerHTML = '<span class="loading-spinner"></span>Відправка...';
 
@@ -438,6 +440,7 @@
 
                 if (result) {
                     paymentCompleted = true;
+                    try { localStorage.removeItem('ton_pending_orderId'); } catch(e) {}
                     showStatus('✅ Транзакція відправлена! Очікуємо підтвердження...', 'success');
                     
                     await notifyBackend(result.boc);
