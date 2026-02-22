@@ -97,6 +97,17 @@
         function useDebounce(value, delay) {
             const [debouncedValue, setDebouncedValue] = useState(value);
 
+            // Проверяем вернулся ли пользователь из TON кошелька без оплаты
+            useEffect(() => {
+                try {
+                    const pendingOrderId = localStorage.getItem('ton_pending_orderId');
+                    if (pendingOrderId) {
+                        localStorage.removeItem('ton_pending_orderId');
+                        setTonCashModal(pendingOrderId);
+                    }
+                } catch(e) {}
+            }, []);
+
             useEffect(() => {
                 const handler = setTimeout(() => {
                     setDebouncedValue(value);
@@ -131,6 +142,7 @@
             const [orderError, setOrderError] = useState('');
             const [ordering, setOrdering] = useState(false);
             const [successModal, setSuccessModal] = useState(false);
+            const [tonCashModal, setTonCashModal] = useState(null); // orderId если вернулся из TON без оплаты
             const [sameDigitsFilter, setSameDigitsFilter] = useState('all'); // 'all', '5', '6', '7'
             
             // Короткие названия для отображения в select
@@ -443,6 +455,33 @@
             return (
                 <div style={styles.container}>
                     {/* Модал успішного замовлення */}
+                    {tonCashModal && (
+                        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
+                            <div style={{background:'#fff',borderRadius:'16px',padding:'28px 24px',maxWidth:'320px',width:'100%',textAlign:'center',boxShadow:'0 8px 32px rgba(0,0,0,0.3)'}}>
+                                <div style={{fontSize:'48px',marginBottom:'12px'}}>💳</div>
+                                <h3 style={{margin:'0 0 8px',fontSize:'18px',fontWeight:'700',color:'#111'}}>Недостатньо коштів?</h3>
+                                <p style={{margin:'0 0 20px',color:'#666',fontSize:'15px'}}>Ви можете оформити замовлення з оплатою при отриманні.</p>
+                                <button onClick={async () => {
+                                    const oid = tonCashModal;
+                                    setTonCashModal(null);
+                                    try {
+                                        const resp = await fetch(API_URL + '/api/pay-by-cash', {
+                                            method: 'POST',
+                                            headers: {'Content-Type':'application/json'},
+                                            body: JSON.stringify({ orderId: oid })
+                                        });
+                                        const result = await resp.json();
+                                        if (result.success) setSuccessModal(true);
+                                    } catch(e) { console.error(e); }
+                                }} style={{background:'#28a745',color:'#fff',border:'none',borderRadius:'10px',padding:'12px 32px',fontSize:'16px',fontWeight:'600',cursor:'pointer',width:'100%',marginBottom:'10px'}}>
+                                    💵 Оплата при отриманні
+                                </button>
+                                <button onClick={() => setTonCashModal(null)} style={{background:'#eee',color:'#333',border:'none',borderRadius:'10px',padding:'10px 32px',fontSize:'15px',cursor:'pointer',width:'100%'}}>
+                                    Скасувати
+                                </button>
+                            </div>
+                        </div>
+                    )}
                     {successModal && (
                         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
                             <div style={{background:'#fff',borderRadius:'16px',padding:'28px 24px',maxWidth:'320px',width:'100%',textAlign:'center',boxShadow:'0 8px 32px rgba(0,0,0,0.2)'}}>
