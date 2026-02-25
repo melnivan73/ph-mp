@@ -212,17 +212,24 @@
                     if (data.success) {
                         setPhones(data.data);
                         setFilteredPhones(data.data);
-                        try {
-                            const tgApp = window.Telegram && window.Telegram.WebApp;
-                            const param = tgApp && tgApp.initDataUnsafe && tgApp.initDataUnsafe.start_param;
-                            if (param && param.startsWith('share_')) {
-                                param.split('_').forEach(function(p) {
-                                    if (p.indexOf('sort-') === 0) setSortBy(p.slice(5));
-                                    else if (p.indexOf('dig-') === 0) setSameDigitsFilter(p.slice(4));
-                                    else if (p.indexOf('max-') === 0) setMaxPriceInput(p.slice(4));
-                                });
-                            }
-                        } catch(ignore) {}
+                        const tryApplyParam = function(attempt) {
+                            try {
+                                const tgApp = window.Telegram && window.Telegram.WebApp;
+                                const param = tgApp && tgApp.initDataUnsafe && tgApp.initDataUnsafe.start_param;
+                                if (!param && attempt < 10) {
+                                    setTimeout(function() { tryApplyParam(attempt + 1); }, 200);
+                                    return;
+                                }
+                                if (param && param.startsWith('share_')) {
+                                    param.split('_').forEach(function(p) {
+                                        if (p.indexOf('sort-') === 0) setSortBy(p.slice(5));
+                                        else if (p.indexOf('dig-') === 0) setSameDigitsFilter(p.slice(4));
+                                        else if (p.indexOf('max-') === 0) setMaxPriceInput(p.slice(4));
+                                    });
+                                }
+                            } catch(ignore) {}
+                        };
+                        tryApplyParam(0);
                     } else {
                         throw new Error(data.error || 'Невідома помилка');
                     }
@@ -538,7 +545,7 @@
                         </div>
 
                         {/* Табы */}
-                        <div style={{...styles.tabs, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                        <div style={{display:'flex', alignItems:'center', gap:'8px', padding:'0 20px', marginBottom:'12px'}}>
                             <button 
                                 style={{...styles.tab, ...(activeTab === 'catalog' ? styles.activeTab : {})}}
                                 onClick={() => setActiveTab('catalog')}
@@ -551,7 +558,7 @@
                             >
                                 Обране ({favorites.length})
                             </button>
-                            <button onClick={handleShare} style={{background:'none',border:'1px solid #667eea',color:'#667eea',borderRadius:'8px',padding:'5px 10px',fontSize:'12px',cursor:'pointer',flexShrink:0}}>🔗 Поділитися</button>
+                            <button onClick={handleShare} style={{background:'none',border:'1px solid #667eea',color:'#667eea',borderRadius:'8px',padding:'6px 10px',fontSize:'12px',cursor:'pointer',whiteSpace:'nowrap',flexShrink:0}}>🔗</button>
                         </div>
 
                         {activeTab === 'catalog' && (
