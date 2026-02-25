@@ -224,23 +224,17 @@
                         
                         // Применяем фильтры из start_param после загрузки данных
                         try {
-                            let param = null;
-                            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
-                                param = window.Telegram.WebApp.initDataUnsafe.start_param;
-                            }
-                            console.log('🔍 start_param:', param);
-                            console.log('🔍 initData:', window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData);
-                            console.log('🔍 URL hash:', window.location.hash);
-                            console.log('🔍 URL search:', window.location.search);
+                            const tgApp = window.Telegram && window.Telegram.WebApp;
+                            let param = (tgApp && tgApp.initDataUnsafe && tgApp.initDataUnsafe.start_param) || null;
                             if (param && !param.startsWith('cash_') && param !== 'all') {
-                                param.split('|').forEach(part => {
-                                    if (part.startsWith('s:')) setSearchQuery(decodeURIComponent(part.slice(2)));
-                                    else if (part.startsWith('sort:')) setSortBy(part.slice(5));
-                                    else if (part.startsWith('dig:')) setSameDigitsFilter(part.slice(4));
-                                    else if (part.startsWith('max:')) setMaxPriceInput(part.slice(4));
+                                param.split('|').forEach(function(part) {
+                                    if (part.indexOf('s:') === 0) setSearchQuery(decodeURIComponent(part.slice(2)));
+                                    else if (part.indexOf('sort:') === 0) setSortBy(part.slice(5));
+                                    else if (part.indexOf('dig:') === 0) setSameDigitsFilter(part.slice(4));
+                                    else if (part.indexOf('max:') === 0) setMaxPriceInput(part.slice(4));
                                 });
                             }
-                        } catch(e) { console.error('startParam error:', e); }
+                        } catch(e) {}
                     } else {
                         throw new Error(data.error || 'Невідома помилка');
                     }
