@@ -212,31 +212,25 @@
                     if (data.success) {
                         setPhones(data.data);
                         setFilteredPhones(data.data);
-                        // Временный дебаг — показываем полный хеш
-                        const debugDiv = document.createElement('div');
-                        debugDiv.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.8);color:#fff;font-size:10px;padding:8px;z-index:99999;word-break:break-all;max-height:120px;overflow:auto;';
-                        debugDiv.textContent = window.location.hash;
-                        document.body.appendChild(debugDiv);
-                        setTimeout(function() { if(debugDiv.parentNode) debugDiv.parentNode.removeChild(debugDiv); }, 15000);
-                        
-                        const tryApplyParam = function(attempt) {
-                            try {
+                        try {
+                            // Читаем start_param из хеша напрямую (работает на мобильном)
+                            let param = null;
+                            const hashStr = decodeURIComponent(window.location.hash);
+                            const hashMatch = hashStr.match(/start_param=([^&]+)/);
+                            if (hashMatch) param = hashMatch[1];
+                            // Запасной вариант — через SDK
+                            if (!param) {
                                 const tgApp = window.Telegram && window.Telegram.WebApp;
-                                const param = tgApp && tgApp.initDataUnsafe && tgApp.initDataUnsafe.start_param;
-                                if (!param && attempt < 10) {
-                                    setTimeout(function() { tryApplyParam(attempt + 1); }, 200);
-                                    return;
-                                }
-                                if (param && param.startsWith('share_')) {
-                                    param.split('_').forEach(function(p) {
-                                        if (p.indexOf('sort-') === 0) setSortBy(p.slice(5));
-                                        else if (p.indexOf('dig-') === 0) setSameDigitsFilter(p.slice(4));
-                                        else if (p.indexOf('max-') === 0) setMaxPriceInput(p.slice(4));
-                                    });
-                                }
-                            } catch(ignore) {}
-                        };
-                        tryApplyParam(0);
+                                param = tgApp && tgApp.initDataUnsafe && tgApp.initDataUnsafe.start_param;
+                            }
+                            if (param && param.startsWith('share_')) {
+                                param.split('_').forEach(function(p) {
+                                    if (p.indexOf('sort-') === 0) setSortBy(p.slice(5));
+                                    else if (p.indexOf('dig-') === 0) setSameDigitsFilter(p.slice(4));
+                                    else if (p.indexOf('max-') === 0) setMaxPriceInput(p.slice(4));
+                                });
+                            }
+                        } catch(ignore) {}
                     } else {
                         throw new Error(data.error || 'Невідома помилка');
                     }
