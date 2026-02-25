@@ -212,14 +212,12 @@
                     if (data.success) {
                         setPhones(data.data);
                         setFilteredPhones(data.data);
-                        // Временный дебаг — показываем на экране
-                        const tgDebug = window.Telegram && window.Telegram.WebApp;
-                        const debugParam = tgDebug && tgDebug.initDataUnsafe && tgDebug.initDataUnsafe.start_param;
+                        // Временный дебаг — показываем полный хеш
                         const debugDiv = document.createElement('div');
-                        debugDiv.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.8);color:#fff;font-size:11px;padding:8px;z-index:99999;word-break:break-all;';
-                        debugDiv.textContent = 'start_param: ' + JSON.stringify(debugParam) + ' | hash: ' + window.location.hash.slice(0,50);
+                        debugDiv.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.8);color:#fff;font-size:10px;padding:8px;z-index:99999;word-break:break-all;max-height:120px;overflow:auto;';
+                        debugDiv.textContent = window.location.hash;
                         document.body.appendChild(debugDiv);
-                        setTimeout(function() { if(debugDiv.parentNode) debugDiv.parentNode.removeChild(debugDiv); }, 8000);
+                        setTimeout(function() { if(debugDiv.parentNode) debugDiv.parentNode.removeChild(debugDiv); }, 15000);
                         
                         const tryApplyParam = function(attempt) {
                             try {
