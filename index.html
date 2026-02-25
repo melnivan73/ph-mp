@@ -120,6 +120,27 @@
                 setTimeout(checkStartParam, 500);
             }, []);
 
+            // Применяем фильтры из start_param при запуске
+            useEffect(() => {
+                const applyStartParam = () => {
+                    try {
+                        let param = null;
+                        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
+                            param = window.Telegram.WebApp.initDataUnsafe.start_param;
+                        }
+                        if (!param || param.startsWith('cash_') || param === 'all') return;
+                        
+                        param.split('_').forEach(part => {
+                            if (part.startsWith('s:')) setSearchQuery(part.slice(2));
+                            else if (part.startsWith('sort:')) setSortBy(part.slice(5));
+                            else if (part.startsWith('dig:')) setSameDigitsFilter(part.slice(4));
+                            else if (part.startsWith('max:')) setMaxPriceInput(part.slice(4));
+                        });
+                    } catch(e) {}
+                };
+                setTimeout(applyStartParam, 600);
+            }, []);
+
             useEffect(() => {
                 const handler = setTimeout(() => {
                     setDebouncedValue(value);
@@ -156,6 +177,27 @@
             const [successModal, setSuccessModal] = useState(false);
             const [tonCashModal, setTonCashModal] = useState(null); // orderId если вернулся из TON без оплаты
             const [sameDigitsFilter, setSameDigitsFilter] = useState('all'); // 'all', '5', '6', '7'
+
+            // Функция шаринга текущих фильтров
+            const handleShare = () => {
+                const parts = [];
+                if (searchQuery) parts.push('s:' + searchQuery);
+                if (sortBy !== 'cheap') parts.push('sort:' + sortBy);
+                if (sameDigitsFilter !== 'all') parts.push('dig:' + sameDigitsFilter);
+                if (maxPriceInput) parts.push('max:' + maxPriceInput);
+                
+                const param = parts.length > 0 ? parts.join('_') : 'all';
+                const appUrl = 'https://t.me/goldnumbersuashop_bot/gold_numbers?startapp=' + encodeURIComponent(param);
+                const text = '📱 Подивись на красиві номери!';
+                const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(appUrl) + '&text=' + encodeURIComponent(text);
+                
+                const webapp = window.Telegram && window.Telegram.WebApp;
+                if (webapp) {
+                    webapp.openTelegramLink(shareUrl);
+                } else {
+                    window.open(shareUrl, '_blank');
+                }
+            };
             
             // Короткие названия для отображения в select
             const sortLabels = {
@@ -513,18 +555,26 @@
                         </div>
 
                         {/* Табы */}
-                        <div style={styles.tabs}>
-                            <button 
-                                style={{...styles.tab, ...(activeTab === 'catalog' ? styles.activeTab : {})}}
-                                onClick={() => setActiveTab('catalog')}
+                        <div style={{...styles.tabs, justifyContent:'space-between', alignItems:'center'}}>
+                            <div style={{display:'flex', gap:'8px'}}>
+                                <button 
+                                    style={{...styles.tab, ...(activeTab === 'catalog' ? styles.activeTab : {})}}
+                                    onClick={() => setActiveTab('catalog')}
+                                >
+                                    Каталог
+                                </button>
+                                <button 
+                                    style={{...styles.tab, ...(activeTab === 'favorites' ? styles.activeTab : {})}}
+                                    onClick={() => setActiveTab('favorites')}
+                                >
+                                    Обране ({favorites.length})
+                                </button>
+                            </div>
+                            <button
+                                onClick={handleShare}
+                                style={{background:'none', border:'1px solid #667eea', color:'#667eea', borderRadius:'8px', padding:'6px 12px', fontSize:'13px', cursor:'pointer', whiteSpace:'nowrap'}}
                             >
-                                Каталог
-                            </button>
-                            <button 
-                                style={{...styles.tab, ...(activeTab === 'favorites' ? styles.activeTab : {})}}
-                                onClick={() => setActiveTab('favorites')}
-                            >
-                                Обране ({favorites.length})
+                                🔗 Поділитися
                             </button>
                         </div>
 
