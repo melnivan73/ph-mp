@@ -156,6 +156,20 @@
             const [successModal, setSuccessModal] = useState(false);
             const [tonCashModal, setTonCashModal] = useState(null); // orderId если вернулся из TON без оплаты
             const [sameDigitsFilter, setSameDigitsFilter] = useState('all'); // 'all', '5', '6', '7'
+
+            const handleShare = React.useCallback(() => {
+                const parts = ['share'];
+                if (sortBy !== 'cheap') parts.push('sort-' + sortBy);
+                if (sameDigitsFilter !== 'all') parts.push('dig-' + sameDigitsFilter);
+                if (maxPriceInput) parts.push('max-' + maxPriceInput);
+                const param = parts.join('_');
+                const appUrl = 'https://t.me/goldnumbersuashop_bot/gold_numbers?startapp=' + param;
+                const text = encodeURIComponent('📱 Подивись на красиві номери!');
+                const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(appUrl) + '&text=' + text;
+                const webapp = window.Telegram && window.Telegram.WebApp;
+                if (webapp) webapp.openTelegramLink(shareUrl);
+                else window.open(shareUrl, '_blank');
+            }, [sortBy, sameDigitsFilter, maxPriceInput]);
             
             // Короткие названия для отображения в select
             const sortLabels = {
@@ -198,6 +212,17 @@
                     if (data.success) {
                         setPhones(data.data);
                         setFilteredPhones(data.data);
+                        try {
+                            const tgApp = window.Telegram && window.Telegram.WebApp;
+                            const param = tgApp && tgApp.initDataUnsafe && tgApp.initDataUnsafe.start_param;
+                            if (param && param.startsWith('share_')) {
+                                param.split('_').forEach(function(p) {
+                                    if (p.indexOf('sort-') === 0) setSortBy(p.slice(5));
+                                    else if (p.indexOf('dig-') === 0) setSameDigitsFilter(p.slice(4));
+                                    else if (p.indexOf('max-') === 0) setMaxPriceInput(p.slice(4));
+                                });
+                            }
+                        } catch(ignore) {}
                     } else {
                         throw new Error(data.error || 'Невідома помилка');
                     }
@@ -513,7 +538,7 @@
                         </div>
 
                         {/* Табы */}
-                        <div style={styles.tabs}>
+                        <div style={{...styles.tabs, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                             <button 
                                 style={{...styles.tab, ...(activeTab === 'catalog' ? styles.activeTab : {})}}
                                 onClick={() => setActiveTab('catalog')}
@@ -526,6 +551,7 @@
                             >
                                 Обране ({favorites.length})
                             </button>
+                            <button onClick={handleShare} style={{background:'none',border:'1px solid #667eea',color:'#667eea',borderRadius:'8px',padding:'5px 10px',fontSize:'12px',cursor:'pointer',flexShrink:0}}>🔗 Поділитися</button>
                         </div>
 
                         {activeTab === 'catalog' && (
