@@ -228,6 +228,10 @@
                             if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
                                 param = window.Telegram.WebApp.initDataUnsafe.start_param;
                             }
+                            console.log('🔍 start_param:', param);
+                            console.log('🔍 initData:', window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData);
+                            console.log('🔍 URL hash:', window.location.hash);
+                            console.log('🔍 URL search:', window.location.search);
                             if (param && !param.startsWith('cash_') && param !== 'all') {
                                 param.split('|').forEach(part => {
                                     if (part.startsWith('s:')) setSearchQuery(decodeURIComponent(part.slice(2)));
