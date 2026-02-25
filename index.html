@@ -120,8 +120,6 @@
                 setTimeout(checkStartParam, 500);
             }, []);
 
-
-
             useEffect(() => {
                 const handler = setTimeout(() => {
                     setDebouncedValue(value);
@@ -158,29 +156,6 @@
             const [successModal, setSuccessModal] = useState(false);
             const [tonCashModal, setTonCashModal] = useState(null); // orderId если вернулся из TON без оплаты
             const [sameDigitsFilter, setSameDigitsFilter] = useState('all'); // 'all', '5', '6', '7'
-
-            // Функция шаринга текущих фильтров
-            const handleShare = () => {
-                // Только безопасные символы для startapp: буквы, цифры, _ и -
-                // Формат: s-ЗАПРОС-sort-SORT-dig-DIG-max-MAX
-                const parts = ['share'];
-                if (searchQuery) parts.push('s-' + searchQuery.replace(/[^a-zA-Z0-9*+]/g, ''));
-                if (sortBy !== 'cheap') parts.push('sort-' + sortBy);
-                if (sameDigitsFilter !== 'all') parts.push('dig-' + sameDigitsFilter);
-                if (maxPriceInput) parts.push('max-' + maxPriceInput);
-                
-                const param = parts.join('_');
-                const appUrl = 'https://t.me/goldnumbersuashop_bot/gold_numbers?startapp=' + encodeURIComponent(param);
-                const text = '📱 Подивись на красиві номери!';
-                const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(appUrl) + '&text=' + encodeURIComponent(text);
-                
-                const webapp = window.Telegram && window.Telegram.WebApp;
-                if (webapp) {
-                    webapp.openTelegramLink(shareUrl);
-                } else {
-                    window.open(shareUrl, '_blank');
-                }
-            };
             
             // Короткие названия для отображения в select
             const sortLabels = {
@@ -223,27 +198,6 @@
                     if (data.success) {
                         setPhones(data.data);
                         setFilteredPhones(data.data);
-                        
-                        // Применяем фильтры из start_param после загрузки данных
-                        const applyFilters = function(attempt) {
-                            try {
-                                const tgApp = window.Telegram && window.Telegram.WebApp;
-                                let param = (tgApp && tgApp.initDataUnsafe && tgApp.initDataUnsafe.start_param) || null;
-                                if (!param && attempt < 5) {
-                                    setTimeout(function() { applyFilters(attempt + 1); }, 300);
-                                    return;
-                                }
-                                if (param && param.startsWith('share_')) {
-                                    param.split('_').forEach(function(part) {
-                                        if (part.indexOf('s-') === 0) setSearchQuery(part.slice(2));
-                                        else if (part.indexOf('sort-') === 0) setSortBy(part.slice(5));
-                                        else if (part.indexOf('dig-') === 0) setSameDigitsFilter(part.slice(4));
-                                        else if (part.indexOf('max-') === 0) setMaxPriceInput(part.slice(4));
-                                    });
-                                }
-                            } catch(e) {}
-                        };
-                        applyFilters(0);
                     } else {
                         throw new Error(data.error || 'Невідома помилка');
                     }
@@ -559,26 +513,18 @@
                         </div>
 
                         {/* Табы */}
-                        <div style={{...styles.tabs, justifyContent:'space-between', alignItems:'center'}}>
-                            <div style={{display:'flex', gap:'8px'}}>
-                                <button 
-                                    style={{...styles.tab, ...(activeTab === 'catalog' ? styles.activeTab : {})}}
-                                    onClick={() => setActiveTab('catalog')}
-                                >
-                                    Каталог
-                                </button>
-                                <button 
-                                    style={{...styles.tab, ...(activeTab === 'favorites' ? styles.activeTab : {})}}
-                                    onClick={() => setActiveTab('favorites')}
-                                >
-                                    Обране ({favorites.length})
-                                </button>
-                            </div>
-                            <button
-                                onClick={handleShare}
-                                style={{background:'none', border:'1px solid #667eea', color:'#667eea', borderRadius:'8px', padding:'6px 12px', fontSize:'13px', cursor:'pointer', whiteSpace:'nowrap'}}
+                        <div style={styles.tabs}>
+                            <button 
+                                style={{...styles.tab, ...(activeTab === 'catalog' ? styles.activeTab : {})}}
+                                onClick={() => setActiveTab('catalog')}
                             >
-                                🔗 Поділитися
+                                Каталог
+                            </button>
+                            <button 
+                                style={{...styles.tab, ...(activeTab === 'favorites' ? styles.activeTab : {})}}
+                                onClick={() => setActiveTab('favorites')}
+                            >
+                                Обране ({favorites.length})
                             </button>
                         </div>
 
