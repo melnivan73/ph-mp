@@ -164,7 +164,7 @@
                 // Только безопасные символы для startapp: буквы, цифры, _ и -
                 // Формат: s-ЗАПРОС-sort-SORT-dig-DIG-max-MAX
                 const parts = ['share'];
-                if (searchQuery) parts.push('s-' + searchQuery.replace(/[^a-zA-Z0-9]/g, ''));
+                if (searchQuery) parts.push('s-' + searchQuery.replace(/[^a-zA-Z0-9*+]/g, ''));
                 if (sortBy !== 'cheap') parts.push('sort-' + sortBy);
                 if (sameDigitsFilter !== 'all') parts.push('dig-' + sameDigitsFilter);
                 if (maxPriceInput) parts.push('max-' + maxPriceInput);
@@ -225,18 +225,25 @@
                         setFilteredPhones(data.data);
                         
                         // Применяем фильтры из start_param после загрузки данных
-                        try {
-                            const tgApp = window.Telegram && window.Telegram.WebApp;
-                            let param = (tgApp && tgApp.initDataUnsafe && tgApp.initDataUnsafe.start_param) || null;
-                            if (param && param.startsWith('share_')) {
-                                param.split('_').forEach(function(part) {
-                                    if (part.indexOf('s-') === 0) setSearchQuery(part.slice(2));
-                                    else if (part.indexOf('sort-') === 0) setSortBy(part.slice(5));
-                                    else if (part.indexOf('dig-') === 0) setSameDigitsFilter(part.slice(4));
-                                    else if (part.indexOf('max-') === 0) setMaxPriceInput(part.slice(4));
-                                });
-                            }
-                        } catch(e) {}
+                        const applyFilters = function(attempt) {
+                            try {
+                                const tgApp = window.Telegram && window.Telegram.WebApp;
+                                let param = (tgApp && tgApp.initDataUnsafe && tgApp.initDataUnsafe.start_param) || null;
+                                if (!param && attempt < 5) {
+                                    setTimeout(function() { applyFilters(attempt + 1); }, 300);
+                                    return;
+                                }
+                                if (param && param.startsWith('share_')) {
+                                    param.split('_').forEach(function(part) {
+                                        if (part.indexOf('s-') === 0) setSearchQuery(part.slice(2));
+                                        else if (part.indexOf('sort-') === 0) setSortBy(part.slice(5));
+                                        else if (part.indexOf('dig-') === 0) setSameDigitsFilter(part.slice(4));
+                                        else if (part.indexOf('max-') === 0) setMaxPriceInput(part.slice(4));
+                                    });
+                                }
+                            } catch(e) {}
+                        };
+                        applyFilters(0);
                     } else {
                         throw new Error(data.error || 'Невідома помилка');
                     }
