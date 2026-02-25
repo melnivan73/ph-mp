@@ -161,13 +161,15 @@
 
             // Функция шаринга текущих фильтров
             const handleShare = () => {
-                const parts = [];
-                if (searchQuery) parts.push('s:' + searchQuery);
-                if (sortBy !== 'cheap') parts.push('sort:' + sortBy);
-                if (sameDigitsFilter !== 'all') parts.push('dig:' + sameDigitsFilter);
-                if (maxPriceInput) parts.push('max:' + maxPriceInput);
+                // Только безопасные символы для startapp: буквы, цифры, _ и -
+                // Формат: s-ЗАПРОС-sort-SORT-dig-DIG-max-MAX
+                const parts = ['share'];
+                if (searchQuery) parts.push('s-' + searchQuery.replace(/[^a-zA-Z0-9]/g, ''));
+                if (sortBy !== 'cheap') parts.push('sort-' + sortBy);
+                if (sameDigitsFilter !== 'all') parts.push('dig-' + sameDigitsFilter);
+                if (maxPriceInput) parts.push('max-' + maxPriceInput);
                 
-                const param = parts.length > 0 ? parts.join('|') : 'all';
+                const param = parts.join('_');
                 const appUrl = 'https://t.me/goldnumbersuashop_bot/gold_numbers?startapp=' + encodeURIComponent(param);
                 const text = '📱 Подивись на красиві номери!';
                 const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(appUrl) + '&text=' + encodeURIComponent(text);
@@ -226,12 +228,12 @@
                         try {
                             const tgApp = window.Telegram && window.Telegram.WebApp;
                             let param = (tgApp && tgApp.initDataUnsafe && tgApp.initDataUnsafe.start_param) || null;
-                            if (param && !param.startsWith('cash_') && param !== 'all') {
-                                param.split('|').forEach(function(part) {
-                                    if (part.indexOf('s:') === 0) setSearchQuery(decodeURIComponent(part.slice(2)));
-                                    else if (part.indexOf('sort:') === 0) setSortBy(part.slice(5));
-                                    else if (part.indexOf('dig:') === 0) setSameDigitsFilter(part.slice(4));
-                                    else if (part.indexOf('max:') === 0) setMaxPriceInput(part.slice(4));
+                            if (param && param.startsWith('share_')) {
+                                param.split('_').forEach(function(part) {
+                                    if (part.indexOf('s-') === 0) setSearchQuery(part.slice(2));
+                                    else if (part.indexOf('sort-') === 0) setSortBy(part.slice(5));
+                                    else if (part.indexOf('dig-') === 0) setSameDigitsFilter(part.slice(4));
+                                    else if (part.indexOf('max-') === 0) setMaxPriceInput(part.slice(4));
                                 });
                             }
                         } catch(e) {}
