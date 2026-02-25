@@ -120,26 +120,7 @@
                 setTimeout(checkStartParam, 500);
             }, []);
 
-            // Применяем фильтры из start_param при запуске
-            useEffect(() => {
-                const applyStartParam = () => {
-                    try {
-                        let param = null;
-                        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
-                            param = window.Telegram.WebApp.initDataUnsafe.start_param;
-                        }
-                        if (!param || param.startsWith('cash_') || param === 'all') return;
-                        
-                        param.split('_').forEach(part => {
-                            if (part.startsWith('s:')) setSearchQuery(part.slice(2));
-                            else if (part.startsWith('sort:')) setSortBy(part.slice(5));
-                            else if (part.startsWith('dig:')) setSameDigitsFilter(part.slice(4));
-                            else if (part.startsWith('max:')) setMaxPriceInput(part.slice(4));
-                        });
-                    } catch(e) {}
-                };
-                setTimeout(applyStartParam, 600);
-            }, []);
+
 
             useEffect(() => {
                 const handler = setTimeout(() => {
@@ -186,7 +167,7 @@
                 if (sameDigitsFilter !== 'all') parts.push('dig:' + sameDigitsFilter);
                 if (maxPriceInput) parts.push('max:' + maxPriceInput);
                 
-                const param = parts.length > 0 ? parts.join('_') : 'all';
+                const param = parts.length > 0 ? parts.join('|') : 'all';
                 const appUrl = 'https://t.me/goldnumbersuashop_bot/gold_numbers?startapp=' + encodeURIComponent(param);
                 const text = '📱 Подивись на красиві номери!';
                 const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(appUrl) + '&text=' + encodeURIComponent(text);
@@ -240,6 +221,22 @@
                     if (data.success) {
                         setPhones(data.data);
                         setFilteredPhones(data.data);
+                        
+                        // Применяем фильтры из start_param после загрузки данных
+                        try {
+                            let param = null;
+                            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
+                                param = window.Telegram.WebApp.initDataUnsafe.start_param;
+                            }
+                            if (param && !param.startsWith('cash_') && param !== 'all') {
+                                param.split('|').forEach(part => {
+                                    if (part.startsWith('s:')) setSearchQuery(decodeURIComponent(part.slice(2)));
+                                    else if (part.startsWith('sort:')) setSortBy(part.slice(5));
+                                    else if (part.startsWith('dig:')) setSameDigitsFilter(part.slice(4));
+                                    else if (part.startsWith('max:')) setMaxPriceInput(part.slice(4));
+                                });
+                            }
+                        } catch(e) { console.error('startParam error:', e); }
                     } else {
                         throw new Error(data.error || 'Невідома помилка');
                     }
