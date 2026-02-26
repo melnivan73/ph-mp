@@ -159,7 +159,11 @@
 
             const handleShare = React.useCallback(() => {
                 const parts = ['share'];
-                if (searchQuery) parts.push('s-' + searchQuery.replace(/\*/g, 'X'));
+                if (searchQuery) {
+                    // Только цифры и x, максимум 7 символов
+                    const safeSearch = searchQuery.replace(/[*XxХх]/g, 'x').replace(/[^\dx]/g, '').slice(0, 7);
+                    if (safeSearch) parts.push('s-' + safeSearch);
+                }
                 if (sortBy !== 'cheap') parts.push('sort-' + sortBy);
                 if (sameDigitsFilter !== 'all') parts.push('dig-' + sameDigitsFilter);
                 if (maxPriceInput) parts.push('max-' + maxPriceInput);
