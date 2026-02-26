@@ -159,6 +159,7 @@
 
             const handleShare = React.useCallback(() => {
                 const parts = ['share'];
+                if (searchQuery) parts.push('s-' + searchQuery.replace(/\*/g, 'X'));
                 if (sortBy !== 'cheap') parts.push('sort-' + sortBy);
                 if (sameDigitsFilter !== 'all') parts.push('dig-' + sameDigitsFilter);
                 if (maxPriceInput) parts.push('max-' + maxPriceInput);
@@ -225,7 +226,8 @@
                             }
                             if (param && param.startsWith('share_')) {
                                 param.split('_').forEach(function(p) {
-                                    if (p.indexOf('sort-') === 0) setSortBy(p.slice(5));
+                                    if (p.indexOf('s-') === 0) setSearchQuery(p.slice(2));
+                                    else if (p.indexOf('sort-') === 0) setSortBy(p.slice(5));
                                     else if (p.indexOf('dig-') === 0) setSameDigitsFilter(p.slice(4));
                                     else if (p.indexOf('max-') === 0) setMaxPriceInput(p.slice(4));
                                 });
@@ -279,8 +281,8 @@
 
             // Поиск с поддержкой маски * (любая цифра) - ИСПРАВЛЕННАЯ ВЕРСИЯ
             const matchesWildcard = (pattern, text) => {
-                // Удаляем все нецифровые символы кроме *
-                const cleanPattern = pattern.replace(/[^\d*]/g, '');
+                // Заменяем X/x/Х/х на * и удаляем остальные нецифровые символы
+                const cleanPattern = pattern.replace(/[XxХх]/g, '*').replace(/[^\d*]/g, '');
                 
                 // Если нет звёздочек, простой поиск по вхождению
                 if (!cleanPattern.includes('*')) {
@@ -575,7 +577,7 @@
                                         style={styles.searchInput}
                                     />
                                     <div style={styles.searchInfoRow}>
-                                        <div style={styles.searchHint}><span style={{fontSize: '18px', verticalAlign: 'middle', lineHeight: '13px'}}>*</span> - будь-яка цифра</div>
+                                        <div style={styles.searchHint}><span style={{fontSize: '18px', verticalAlign: 'middle', lineHeight: '13px'}}>X</span> - будь-яка цифра</div>
                                         <div style={styles.searchCounter}>{searchCounter}</div>
                                     </div>
                                 </div>
